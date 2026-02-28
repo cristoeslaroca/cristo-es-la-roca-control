@@ -1050,8 +1050,8 @@
     </div>
 
     <script>
-        // ⚠️⚠️⚠️ REEMPLAZA ESTA URL CON LA TUYA DE GOOGLE APPS SCRIPT ⚠️⚠️⚠️
-        const API_URL = 'https://script.google.com/macros/s/AKfycbzxxxxxxxxxxxxxxxxxxxxxxxx/exec';
+        // ✅ TU URL DE GOOGLE APPS SCRIPT
+        const API_URL = 'https://script.google.com/macros/s/AKfycbzdG83hhyvUv-b3n4BuJRT7GgtoRH81WEq3SReBXRbBQfrcxtef0E4rZxZ1ktTLz8h9/exec';
         
         // CONFIGURACIÓN DE USUARIOS
         const USERS_KEY = 'cristo_roca_users';
@@ -1128,27 +1128,12 @@
             document.getElementById('loginScreen').style.display = 'none';
             document.getElementById('appContainer').style.display = 'block';
             document.getElementById('currentUser').textContent = users[currentUser].name;
-            
-            if (checkConfig()) {
-                cargarDatos();
-            } else {
-                // Si no hay URL configurada, mostrar datos de ejemplo
-                datosGlobales = [];
-                actualizarTodo();
-            }
+            cargarDatos();
         }
 
         function logout() {
             sessionStorage.removeItem('cristoRocaSession');
             location.reload();
-        }
-
-        function checkConfig() {
-            if (API_URL.includes('xxxxxxxx')) {
-                console.warn('API_URL no configurada');
-                return false;
-            }
-            return true;
         }
 
         // CARGAR DATOS DESDE GOOGLE SHEETS
@@ -1368,7 +1353,6 @@
                         <td><span class="badge ${metasCum === metasTot && metasTot > 0 ? 'badge-success' : metasCum > 0 ? 'badge-warning' : 'badge-danger'}">${metasCum}/${metasTot}</span></td>
                         <td>
                             <button class="btn btn-primary" onclick="verDetalle(${reg.id})" style="padding: 5px 10px; font-size: 0.8rem;">Ver</button>
-                            <button class="btn btn-danger" onclick="eliminarRegistro(${reg.id})" style="padding: 5px 10px; font-size: 0.8rem;">Eliminar</button>
                         </td>
                     </tr>
                 `;
@@ -1579,7 +1563,6 @@
             const ministerio = document.getElementById('filterMinisterio').value;
             const mes = document.getElementById('filterMes').value;
             
-            // Recargar datos originales y filtrar
             cargarDatos().then(() => {
                 if (ministerio) {
                     datosGlobales = datosGlobales.filter(r => r.ministerio === ministerio);
@@ -1677,15 +1660,6 @@
         function closeModal(e) {
             if (!e || e.target.id === 'detailModal' || e.target.className === 'close-modal') {
                 document.getElementById('detailModal').style.display = 'none';
-            }
-        }
-
-        function eliminarRegistro(id) {
-            if (confirm('¿Está seguro de eliminar este registro? (Nota: Esto solo eliminará del almacenamiento local. Para eliminar de Google Sheets, debe hacerlo manualmente en la hoja de cálculo)')) {
-                let datos = JSON.parse(localStorage.getItem('cristo_es_la_roca_offline')) || [];
-                datos = datos.filter(r => r.id !== id);
-                localStorage.setItem('cristo_es_la_roca_offline', JSON.stringify(datos));
-                cargarDatos();
             }
         }
 
