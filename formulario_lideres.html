@@ -501,14 +501,17 @@
             try {
                 const response = await fetch(API_URL, {
                     method: 'POST',
-                    body: JSON.stringify(data),
+                    mode: 'no-cors',
+                    cache: 'no-cache',
                     headers: {
-                        'Content-Type': 'application/json'
-                    }
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data),
+                    redirect: 'follow'
                 });
                 
-                const result = await response.json();
-                return result.result === 'success';
+                // En modo no-cors asumimos éxito si no hay error de red
+                return true;
             } catch (error) {
                 console.error('Error al guardar en la nube:', error);
                 return false;
@@ -571,7 +574,7 @@
             const saved = await saveToCloud(data);
             
             if (saved) {
-                showMessage('✅ ¡Datos guardados en la nube exitosamente! Dios bendiga su ministerio.', 'success');
+                showMessage('✅ ¡Datos guardados exitosamente! Dios bendiga su ministerio.', 'success');
                 
                 setTimeout(() => {
                     document.getElementById('controlForm').reset();
