@@ -62,6 +62,7 @@
         .connection-status { display: inline-flex; align-items: center; gap: 8px; padding: 8px 15px; border-radius: 20px; font-size: 0.85rem; font-weight: 500; }
         .connection-online { background: #d4edda; color: #155724; }
         .connection-offline { background: #f8d7da; color: #721c24; }
+        .connection-local { background: #fff3cd; color: #856404; }
         .status-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px; }
         .stat-card {
@@ -325,7 +326,7 @@
                 </div>
                 <div class="card" style="background: #fff3cd; border-left: 5px solid #f39c12;">
                     <h4 style="color: #856404; margin-bottom: 10px;">⚠️ Nota de Seguridad</h4>
-                    <p style="color: #856404; font-size: 0.95rem;">Por seguridad, se recomienda cambiar las contraseñas periódicamente. Las contraseñas se almacenan de forma segura en el navegador de este dispositivo.</p>
+                    <p style="color: #856404; font-size: 0.95rem;">Por seguridad, se recomienda cambiar las contraseñas periódicamente.</p>
                 </div>
             </div>
         </div>
@@ -344,7 +345,7 @@
 
     <script>
         // ✅ REEMPLAZA CON TU NUEVA URL DESPUÉS DE CREAR LA IMPLEMENTACIÓN
-        const API_URL = 'https://script.google.com/macros/s/AKfycbys2qxG15pqDZv_lmF_-DZSWSWrfsdPsFpiZPEgw_lVaNny7zWYVZoJq08FtjL1K8qR/exec';
+        const API_URL = 'https://script.google.com/macros/s/AKfycbzhlBolcIpKQYAvDdL5Xa23zeznejSq6TsZIcSunxo_WaytYzyGqjLP1vnmkmMbx9xp/exec';
         
         const USERS_KEY = 'cristo_roca_users';
         const DEFAULT_USERS = {
@@ -427,35 +428,66 @@
             location.reload();
         }
 
-        // CARGAR DATOS CON MÚLTIPLES MÉTODOS
+        // ✅ CARGAR DATOS VÍA JSONP (nunca falla por CORS)
         async function cargarDatos() {
             showLoading(true);
             datosEnLinea = false;
             
-            // Intentar múltiples métodos de conexión
-            await intentarCargarJSONP();
+            console.log('Intentando cargar datos vía JSONP...');
             
-            // Si JSONP falló, usar datos locales
-            if (!datosEnLinea) {
-                const localData = JSON.parse(localStorage.getItem('cristo_es_la_roca_offline')) || [];
-                datosGlobales = localData;
-                updateConnectionStatus(false);
+            try {
+                const resultado = await cargarJSONP();
+                
+                if (resultado.success && resultado.data) {
+                    console.log('Datos cargados desde Google Sheets:', resultado.data.length, 'registros');
+                    datosGlobales = transformarDatos(resultado.data);
+                    datosEnLinea = true;
+                    updateConnectionStatus('online');
+                    
+                    // Guardar en caché local
+                    localStorage.setItem('cristo_es_la_roca_cache', JSON.stringify(datosGlobales));
+                } else {
+                    throw new Error('No se pudieron cargar datos');
+                }
+            } catch (error) {
+                console.log('Error cargando desde Sheets:', error);
+                
+                // Usar caché local si existe
+                const cache = localStorage.getItem('cristo_es_la_roca_cache');
+                const localData = localStorage.getItem('cristo_es_la_roca_offline');
+                
+                if (cache) {
+                    console.log('Usando caché local');
+                    datosGlobales = JSON.parse(cache);
+                    updateConnectionStatus('local');
+                } else if (localData) {
+                    console.log('Usando datos offline');
+                    datosGlobales = JSON.parse(localData);
+                    updateConnectionStatus('offline');
+                } else {
+                    datosGlobales = [];
+                    updateConnectionStatus('offline');
+                }
             }
             
             showLoading(false);
             actualizarTodo();
         }
 
-        // Método JSONP para evitar CORS
-        async function intentarCargarJSONP() {
+        // Función JSONP para cargar datos
+        function cargarJSONP() {
             return new Promise((resolve) => {
-                const callbackName = 'gscript_callback_' + Date.now();
+                const callbackName = 'loadCallback_' + Date.now();
                 const script = document.createElement('script');
                 
+                const url = `${API_URL}?callback=${callbackName}&_=${Date.now()}`;
+                console.log('Cargando:', url);
+                
                 const timeout = setTimeout(() => {
+                    console.log('Timeout cargando datos');
                     cleanup();
-                    resolve(false);
-                }, 8000);
+                    resolve({success: false, error: 'timeout'});
+                }, 10000);
                 
                 function cleanup() {
                     clearTimeout(timeout);
@@ -464,70 +496,87 @@
                 }
                 
                 window[callbackName] = function(data) {
+                    console.log('Respuesta recibida:', Array.isArray(data) ? data.length + ' items' : typeof data);
                     cleanup();
+                    
                     if (Array.isArray(data)) {
-                        datosGlobales = transformarDatosSheets(data);
-                        datosEnLinea = true;
-                        updateConnectionStatus(true);
-                        // Guardar en localStorage como caché
-                        localStorage.setItem('cristo_es_la_roca_cache', JSON.stringify(datosGlobales));
+                        resolve({success: true, data: data});
+                    } else if (data && data.error) {
+                        resolve({success: false, error: data.error});
+                    } else {
+                        resolve({success: true, data: []});
                     }
-                    resolve(true);
                 };
                 
                 script.onerror = () => {
+                    console.log('Error de red cargando datos');
                     cleanup();
-                    resolve(false);
+                    resolve({success: false, error: 'network'});
                 };
                 
-                // Agregar parámetro para evitar caché
-                const url = API_URL + '?callback=' + callbackName + '&_=' + Date.now();
                 script.src = url;
                 document.head.appendChild(script);
             });
         }
 
-        function transformarDatosSheets(sheetsData) {
+        function transformarDatos(sheetsData) {
             const agrupados = {};
             
             sheetsData.forEach(row => {
-                const key = (row.Lider || row.lider || '') + '_' + (row['Fecha Desde'] || row.fechaDesde || '');
+                // Normalizar nombres de campos
+                const id = row.ID || row.id || Date.now();
+                const ministerio = row.Ministerio || row.ministerio || '';
+                const lider = row.Lider || row.lider || '';
+                const fechaDesde = row['Fecha Desde'] || row.fechaDesde || row.fecha_desde || '';
+                const fechaHasta = row['Fecha Hasta'] || row.fechaHasta || row.fecha_hasta || '';
+                const fechaRegistro = row['Fecha Registro'] || row.fechaRegistro || row.fecha_registro || new Date().toISOString();
+                
+                const key = `${lider}_${fechaDesde}`;
+                
                 if (!agrupados[key]) {
                     agrupados[key] = {
-                        id: row.ID || row.id || Date.now(),
-                        ministerio: row.Ministerio || row.ministerio || '',
-                        lider: row.Lider || row.lider || '',
-                        fechaDesde: row['Fecha Desde'] || row.fechaDesde || '',
-                        fechaHasta: row['Fecha Hasta'] || row.fechaHasta || '',
-                        fechaRegistro: row['Fecha Registro'] || row.fechaRegistro || new Date().toISOString(),
+                        id: id,
+                        ministerio: ministerio,
+                        lider: lider,
+                        fechaDesde: fechaDesde,
+                        fechaHasta: fechaHasta,
+                        fechaRegistro: fechaRegistro,
                         actividades: []
                     };
                 }
                 
-                agrupados[key].actividades.push({
-                    fecha: row['Fecha Actividad'] || row.fechaActividad || '',
-                    actividad: row.Actividad || row.actividad || '',
-                    meta: row.Meta || row.meta || '',
-                    participantes: parseInt(row.Participantes || row.participantes) || 0,
-                    ausentes: parseInt(row.Ausentes || row.ausentes) || 0,
-                    ofrenda: parseFloat(row.Ofrenda || row.ofrenda) || 0,
-                    cumplida: row['Meta Cumplida'] || row.metaCumplida || row.cumplida || '',
-                    resultados: row.Resultados || row.resultados || '',
-                    observaciones: row.Observaciones || row.observaciones || ''
-                });
+                // Solo agregar si hay actividad
+                const actividad = row.Actividad || row.actividad;
+                if (actividad || row['Fecha Actividad'] || row.fechaActividad) {
+                    agrupados[key].actividades.push({
+                        fecha: row['Fecha Actividad'] || row.fechaActividad || row.fecha_actividad || '',
+                        actividad: actividad || '',
+                        meta: row.Meta || row.meta || '',
+                        participantes: parseInt(row.Participantes || row.participantes) || 0,
+                        ausentes: parseInt(row.Ausentes || row.ausentes) || 0,
+                        ofrenda: parseFloat(row.Ofrenda || row.ofrenda) || 0,
+                        cumplida: row['Meta Cumplida'] || row.metaCumplida || row.cumplida || '',
+                        resultados: row.Resultados || row.resultados || '',
+                        observaciones: row.Observaciones || row.observaciones || ''
+                    });
+                }
             });
             
             return Object.values(agrupados);
         }
 
-        function updateConnectionStatus(online) {
+        function updateConnectionStatus(status) {
             const statusEl = document.getElementById('connectionStatus');
-            if (online) {
+            
+            if (status === 'online') {
                 statusEl.className = 'connection-status connection-online';
-                statusEl.innerHTML = '<span class="status-dot"></span><span>En línea</span>';
+                statusEl.innerHTML = '<span class="status-dot"></span><span>En línea (Sheets)</span>';
+            } else if (status === 'local') {
+                statusEl.className = 'connection-status connection-local';
+                statusEl.innerHTML = '<span class="status-dot"></span><span>Modo caché local</span>';
             } else {
                 statusEl.className = 'connection-status connection-offline';
-                statusEl.innerHTML = '<span class="status-dot"></span><span>Offline (datos locales)</span>';
+                statusEl.innerHTML = '<span class="status-dot"></span><span>Sin conexión</span>';
             }
         }
 
@@ -852,23 +901,22 @@
             const mes = document.getElementById('filterMes').value;
             
             // Recargar datos base
-            const localData = JSON.parse(localStorage.getItem('cristo_es_la_roca_offline')) || [];
-            datosGlobales = localData;
-            
-            if (ministerio) {
-                datosGlobales = datosGlobales.filter(r => r.ministerio === ministerio);
-            }
-            
-            if (mes) {
-                datosGlobales = datosGlobales.filter(r => {
-                    const fecha = new Date(r.fechaDesde);
-                    return fecha.toISOString().startsWith(mes);
-                });
-            }
-            
-            actualizarStats();
-            actualizarRegistros();
-            generarGraficoOfrendas();
+            cargarDatos().then(() => {
+                if (ministerio) {
+                    datosGlobales = datosGlobales.filter(r => r.ministerio === ministerio);
+                }
+                
+                if (mes) {
+                    datosGlobales = datosGlobales.filter(r => {
+                        const fecha = new Date(r.fechaDesde);
+                        return fecha.toISOString().startsWith(mes);
+                    });
+                }
+                
+                actualizarStats();
+                actualizarRegistros();
+                generarGraficoOfrendas();
+            });
         }
 
         function verDetalle(id) {
@@ -1246,4 +1294,5 @@
     </script>
 </body>
 </html>
+
 
