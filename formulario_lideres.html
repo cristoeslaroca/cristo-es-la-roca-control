@@ -86,6 +86,11 @@
             padding: 15px; margin-bottom: 20px; border-radius: 5px;
             color: #856404; display: none;
         }
+        .online-mode {
+            background: #d4edda; border-left: 5px solid #27ae60;
+            padding: 15px; margin-bottom: 20px; border-radius: 5px;
+            color: #155724; display: none;
+        }
         .spinner {
             display: inline-block; width: 20px; height: 20px;
             border: 3px solid rgba(255,255,255,.3); border-radius: 50%;
@@ -109,6 +114,10 @@
         <div class="card">
             <div class="info-box">
                 📋 <strong>Instrucciones:</strong> Complete todos los campos requeridos. Puede llenar de 1 a 5 actividades por semana. Los campos marcados con * son obligatorios.
+            </div>
+
+            <div id="onlineMessage" class="online-mode">
+                ✅ <strong>Conectado:</strong> Los datos se guardarán en Google Sheets.
             </div>
 
             <div id="offlineMessage" class="offline-mode">
@@ -191,9 +200,10 @@
 
     <script>
         // ✅ REEMPLAZA CON TU NUEVA URL DESPUÉS DE CREAR LA IMPLEMENTACIÓN
-        const API_URL = 'https://script.google.com/macros/s/AKfycbys2qxG15pqDZv_lmF_-DZSWSWrfsdPsFpiZPEgw_lVaNny7zWYVZoJq08FtjL1K8qR/exec';
+        const API_URL = 'https://script.google.com/macros/s/AKfycbzdG83hhyvUv-b3n4BuJRT7GgtoRH81WEq3SReBXRbBQfrcxtef0E4rZxZ1ktTLz8h9/exec';
         
         const DB_KEY = 'cristo_es_la_roca_offline';
+        let conexionActiva = false;
         
         function initDB() {
             if (!localStorage.getItem(DB_KEY)) {
@@ -263,21 +273,27 @@
             return data;
         }
 
-        // MÉTODO ALTERNATIVO: Usar JSONP para evitar CORS
-        async function saveToCloud(data) {
+        // ✅ MÉTODO JSONP - NUNCA FALLA POR CORS
+        function enviarDatosJSONP(data) {
             return new Promise((resolve) => {
-                const callbackName = 'callback_' + Date.now();
+                const callbackName = 'saveCallback_' + Date.now();
                 const script = document.createElement('script');
                 
-                // Crear URL con datos codificados
-                const dataString = encodeURIComponent(JSON.stringify(data));
-                const url = `${API_URL}?callback=${callbackName}&data=${dataString}&method=POST`;
+                // Codificar datos para URL
+                const jsonData = JSON.stringify(data);
+                const encodedData = encodeURIComponent(jsonData);
+                
+                // Construir URL con parámetros GET
+                const url = `${API_URL}?callback=${callbackName}&data=${encodedData}&_=${Date.now()}`;
+                
+                console.log('Enviando a:', url.substring(0, 100) + '...');
                 
                 // Timeout de seguridad
                 const timeout = setTimeout(() => {
+                    console.log('Timeout JSONP');
                     cleanup();
-                    resolve(false);
-                }, 10000);
+                    resolve({success: false, error: 'timeout'});
+                }, 15000);
                 
                 function cleanup() {
                     clearTimeout(timeout);
@@ -285,16 +301,26 @@
                     delete window[callbackName];
                 }
                 
+                // Función callback que recibe la respuesta
                 window[callbackName] = function(response) {
+                    console.log('Respuesta JSONP:', response);
                     cleanup();
-                    resolve(response && response.result === 'success');
+                    
+                    if (response && response.result === 'success') {
+                        resolve({success: true, data: response});
+                    } else {
+                        resolve({success: false, error: response ? response.message : 'Error desconocido'});
+                    }
                 };
                 
-                script.onerror = function() {
+                // Manejar errores de carga del script
+                script.onerror = function(e) {
+                    console.log('Error cargando script JSONP:', e);
                     cleanup();
-                    resolve(false);
+                    resolve({success: false, error: 'network_error'});
                 };
                 
+                // Iniciar carga
                 script.src = url;
                 document.head.appendChild(script);
             });
@@ -304,6 +330,7 @@
             const registros = JSON.parse(localStorage.getItem(DB_KEY)) || [];
             registros.push(data);
             localStorage.setItem(DB_KEY, JSON.stringify(registros));
+            console.log('Guardado localmente:', data.id);
         }
 
         function showMessage(text, type, duration = 4000) {
@@ -316,11 +343,27 @@
             }, duration);
         }
 
+        function mostrarEstadoConexion(online) {
+            const onlineMsg = document.getElementById('onlineMessage');
+            const offlineMsg = document.getElementById('offlineMessage');
+            
+            if (online) {
+                onlineMsg.style.display = 'block';
+                offlineMsg.style.display = 'none';
+                conexionActiva = true;
+            } else {
+                onlineMsg.style.display = 'none';
+                offlineMsg.style.display = 'block';
+                conexionActiva = false;
+            }
+        }
+
         function limpiarFormulario() {
             if (confirm('¿Desea limpiar todos los campos? Se perderán los datos no guardados.')) {
                 document.getElementById('controlForm').reset();
                 generateTableRows();
                 setDefaultDates();
+                mostrarEstadoConexion(false);
             }
         }
 
@@ -335,6 +378,7 @@
             document.getElementById('fechaHasta').valueAsDate = finSemana;
         }
 
+        // Evento submit del formulario
         document.getElementById('controlForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
@@ -352,53 +396,72 @@
                 return;
             }
 
-            // Intentar guardar en la nube
-            const saved = await saveToCloud(data);
+            console.log('Enviando datos:', data);
             
-            if (saved) {
-                showMessage('✅ ¡Datos guardados exitosamente! Dios bendiga su ministerio.', 'success');
+            // Intentar enviar vía JSONP
+            const resultado = await enviarDatosJSONP(data);
+            
+            if (resultado.success) {
+                console.log('Éxito:', resultado.data);
+                mostrarEstadoConexion(true);
+                showMessage('✅ ¡Datos guardados en la nube exitosamente! Dios bendiga su ministerio.', 'success');
+                
                 setTimeout(() => {
                     document.getElementById('controlForm').reset();
                     generateTableRows();
                     setDefaultDates();
+                    mostrarEstadoConexion(false);
                 }, 2000);
             } else {
-                // Fallback a modo offline
+                console.log('Fallo, guardando local:', resultado.error);
                 saveLocal(data);
-                document.getElementById('offlineMessage').style.display = 'block';
-                showMessage('⚠️ Modo offline: Datos guardados localmente.', 'warning', 6000);
+                mostrarEstadoConexion(false);
+                showMessage('⚠️ Guardado localmente. Se sincronizará cuando haya conexión.', 'warning', 6000);
             }
             
             btn.innerHTML = originalText;
             btn.disabled = false;
         });
 
-        async function syncPendingData() {
+        // Sincronizar datos pendientes al cargar
+        async function sincronizarPendientes() {
             const pendientes = JSON.parse(localStorage.getItem(DB_KEY)) || [];
             if (pendientes.length === 0) return;
             
-            let enviados = 0;
-            for (const data of pendientes) {
-                const saved = await saveToCloud(data);
-                if (saved) enviados++;
-            }
+            console.log('Intentando sincronizar', pendientes.length, 'registros...');
             
-            if (enviados > 0) {
-                const restantes = pendientes.slice(enviados);
-                localStorage.setItem(DB_KEY, JSON.stringify(restantes));
-                showMessage(`✅ ${enviados} registro(s) sincronizado(s)`, 'success');
-                if (restantes.length === 0) {
-                    document.getElementById('offlineMessage').style.display = 'none';
+            let enviados = 0;
+            const fallidos = [];
+            
+            for (const data of pendientes) {
+                const resultado = await enviarDatosJSONP(data);
+                if (resultado.success) {
+                    enviados++;
+                    console.log('Sincronizado:', data.id);
+                } else {
+                    fallidos.push(data);
                 }
             }
+            
+            // Guardar los que fallaron de nuevo
+            localStorage.setItem(DB_KEY, JSON.stringify(fallidos));
+            
+            if (enviados > 0) {
+                showMessage(`✅ ${enviados} registro(s) sincronizado(s) con la nube`, 'success');
+            }
+            
+            console.log('Sincronización completa. Enviados:', enviados, 'Pendientes:', fallidos.length);
         }
 
+        // Inicializar
         initDB();
         generateTableRows();
         setDefaultDates();
         
-        // Intentar sincronizar al cargar
-        window.addEventListener('load', syncPendingData);
+        // Intentar sincronizar al cargar la página
+        window.addEventListener('load', function() {
+            setTimeout(sincronizarPendientes, 1000);
+        });
     </script>
 </body>
 </html>
