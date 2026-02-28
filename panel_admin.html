@@ -85,6 +85,7 @@
         .btn-success { background: #27ae60; color: white; }
         .btn-danger { background: #e74c3c; color: white; }
         .btn-warning { background: #f39c12; color: white; }
+        .btn-secondary { background: #6c757d; color: white; }
         .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
         .btn-small { padding: 5px 10px; font-size: 0.8rem; }
         .data-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
@@ -134,10 +135,20 @@
         .loading-spinner { width: 60px; height: 60px; border: 5px solid #f3f3f3; border-top: 5px solid #2a5298; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
-        /* Estilos para botones de eliminar */
-        .btn-eliminar { background: #dc3545; color: white; }
-        .btn-eliminar:hover { background: #c82333; }
-        .acciones-cell { display: flex; gap: 5px; }
+        /* ============================================
+           ESTILOS PARA BOTONES DE ELIMINAR - NUEVO
+           ============================================ */
+        .btn-eliminar { 
+            background: #dc3545; 
+            color: white; 
+        }
+        .btn-eliminar:hover { 
+            background: #c82333; 
+        }
+        .acciones-cell { 
+            display: flex; 
+            gap: 5px; 
+        }
         
         /* Modal de confirmación */
         .confirm-modal { max-width: 400px; text-align: center; }
@@ -192,6 +203,7 @@
                 <li><a href="#" onclick="showSection('metas')">🎯 Cumplimiento de Metas</a></li>
                 <li><a href="#" onclick="showSection('configuracion')">⚙️ Configuración</a></li>
                 <li><a href="#" onclick="exportarDatos()">📥 Exportar a Excel</a></li>
+                <!-- NUEVO: Opción para eliminar todos -->
                 <li><a href="#" onclick="mostrarEliminarTodos()" style="color: #ff6b6b;">🗑️ Eliminar TODOS los registros</a></li>
             </ul>
         </div>
@@ -356,7 +368,11 @@
         </div>
     </div>
 
-    <!-- Modal de Confirmación Eliminar -->
+    <!-- ============================================
+         MODALES DE ELIMINACIÓN - NUEVOS
+         ============================================ -->
+    
+    <!-- Modal de Confirmación Eliminar Uno -->
     <div id="confirmModal" class="modal">
         <div class="modal-content confirm-modal">
             <h3>⚠️ Confirmar Eliminación</h3>
@@ -385,8 +401,8 @@
     </div>
 
     <script>
-        // ✅ REEMPLAZA CON TU NUEVA URL
-        const API_URL = 'https://script.google.com/macros/s/AKfycbxpk8cDLYYm7UBnvPw8pLacCwfdMmc4OBGmfqBNFpiPx7BLtttUY8VNPmAx63ED8_5Z/exec';
+        // ✅ REEMPLAZA CON TU URL DE APPS SCRIPT
+        const API_URL = 'https://script.google.com/macros/s/AKfycbzdG83hhyvUv-b3n4BuJRT7GgtoRH81WEq3SReBXRbBQfrcxtef0E4rZxZ1ktTLz8h9/exec';
         
         const USERS_KEY = 'cristo_roca_users';
         const DEFAULT_USERS = {
@@ -608,7 +624,9 @@
             document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none';
         }
 
-        // ==================== FUNCIONES DE ELIMINACIÓN ====================
+        // ============================================================
+        // FUNCIONES DE ELIMINACIÓN - NUEVAS
+        // ============================================================
 
         // Mostrar modal para eliminar un registro
         function mostrarEliminar(id) {
@@ -638,7 +656,6 @@
                 
                 if (resultado.success) {
                     showAlert('✅ Registro eliminado correctamente', 'success');
-                    // Recargar datos
                     await cargarDatos();
                 } else {
                     showAlert('❌ Error al eliminar: ' + resultado.error, 'error');
@@ -717,7 +734,6 @@
                 
                 if (resultado.success) {
                     showAlert('✅ Todos los registros han sido eliminados', 'success');
-                    // Limpiar caché local también
                     localStorage.removeItem('cristo_es_la_roca_cache');
                     localStorage.removeItem('cristo_es_la_roca_offline');
                     await cargarDatos();
@@ -769,7 +785,15 @@
             });
         }
 
-        // ==================== FIN FUNCIONES DE ELIMINACIÓN ====================
+        // Cerrar modal y mostrar eliminar
+        function cerrarModalYMostrarEliminar(id) {
+            closeModal();
+            setTimeout(() => mostrarEliminar(id), 300);
+        }
+
+        // ============================================================
+        // FIN FUNCIONES DE ELIMINACIÓN
+        // ============================================================
 
         function actualizarTodo() {
             actualizarStats();
@@ -1146,17 +1170,14 @@
                         `).join('') : '<tr><td colspan="7">Sin actividades</td></tr>'}
                     </tbody>
                 </table>
-                <div style="margin-top: 20px; text-align: center;">
-                    <button class="btn btn-eliminar" onclick="cerrarModalYMostrarEliminar('${reg.id}')">🗑️ Eliminar este registro</button>
+                <div style="margin-top: 20px; text-align: center; border-top: 2px solid #eee; padding-top: 20px;">
+                    <button class="btn btn-eliminar" onclick="cerrarModalYMostrarEliminar('${reg.id}')" style="padding: 10px 20px;">
+                        🗑️ Eliminar este registro
+                    </button>
                 </div>
             `;
             
             document.getElementById('detailModal').style.display = 'flex';
-        }
-
-        function cerrarModalYMostrarEliminar(id) {
-            closeModal();
-            setTimeout(() => mostrarEliminar(id), 300);
         }
 
         function closeModal(e) {
@@ -1480,6 +1501,3 @@
     </script>
 </body>
 </html>
-
-
-
