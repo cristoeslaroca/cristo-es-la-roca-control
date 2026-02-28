@@ -226,9 +226,14 @@
             color: white;
         }
 
-        .btn-primary:hover {
+        .btn-primary:hover:not(:disabled) {
             transform: translateY(-2px);
             box-shadow: 0 10px 30px rgba(30, 60, 114, 0.4);
+        }
+
+        .btn-primary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
         }
 
         .btn-secondary {
@@ -261,6 +266,12 @@
             border: 1px solid #f5c6cb;
         }
 
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
         .info-box {
             background: #e3f2fd;
             border-left: 5px solid #2196f3;
@@ -270,21 +281,30 @@
             color: #0d47a1;
         }
 
-        .admin-link {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: rgba(255,255,255,0.2);
-            color: white;
-            padding: 10px 20px;
-            border-radius: 20px;
-            text-decoration: none;
-            font-size: 0.9rem;
-            transition: all 0.3s;
+        .offline-mode {
+            background: #fff3cd;
+            border-left: 5px solid #f39c12;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            color: #856404;
+            display: none;
         }
 
-        .admin-link:hover {
-            background: rgba(255,255,255,0.3);
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
 
         @keyframes fadeInUp {
@@ -299,7 +319,7 @@
 
         @media print {
             body { background: white; }
-            .btn-container, .header-banner, .admin-link { display: none; }
+            .btn-container, .header-banner { display: none; }
             .card { box-shadow: none; border: 1px solid #ddd; page-break-inside: avoid; }
         }
 
@@ -309,6 +329,7 @@
             .form-row { grid-template-columns: 1fr; }
             .date-range { grid-template-columns: 1fr; }
             .date-separator { display: none; }
+            .activities-table { min-width: 1000px; }
         }
     </style>
 </head>
@@ -322,6 +343,10 @@
         <div class="card">
             <div class="info-box">
                 📋 <strong>Instrucciones:</strong> Complete todos los campos requeridos. Puede llenar de 1 a 5 actividades por semana. Los campos marcados con * son obligatorios.
+            </div>
+
+            <div id="offlineMessage" class="offline-mode">
+                ⚠️ <strong>Modo Offline:</strong> No hay conexión con el servidor. Los datos se guardarán localmente y se enviarán cuando haya conexión.
             </div>
 
             <div id="message" class="message"></div>
@@ -384,18 +409,25 @@
                 </div>
 
                 <div class="btn-container">
-                    <button type="submit" class="btn-primary">💾 Guardar Control Semanal</button>
-                    <button type="button" class="btn-secondary" onclick="limpiarFormulario()">🔄 Limpiar Formulario</button>
-                    <button type="button" class="btn-secondary" onclick="window.print()">🖨️ Imprimir</button>
+                    <button type="submit" class="btn-primary" id="submitBtn">
+                        💾 Guardar Control Semanal
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="limpiarFormulario()">
+                        🔄 Limpiar Formulario
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="window.print()">
+                        🖨️ Imprimir
+                    </button>
                 </div>
             </form>
         </div>
     </div>
 
-    <a href="panel_admin.html" class="admin-link">🔐 Admin</a>
-
     <script>
-        const DB_KEY = 'cristo_es_la_roca_db';
+        // ⚠️⚠️⚠️ REEMPLAZA ESTA URL CON LA TUYA DE GOOGLE APPS SCRIPT ⚠️⚠️⚠️
+        const API_URL = 'https://script.google.com/macros/s/AKfycbzxxxxxxxxxxxxxxxxxxxxxxxx/exec';
+        
+        const DB_KEY = 'cristo_es_la_roca_offline';
         
         function initDB() {
             if (!localStorage.getItem(DB_KEY)) {
@@ -433,7 +465,7 @@
         function getFormData() {
             const formData = new FormData(document.getElementById('controlForm'));
             const data = {
-                id: Date.now(),
+                id: Date.now().toString(),
                 iglesia: "Templo Evangélico Pentecostés Independiente Cristo es la Roca",
                 ministerio: formData.get('ministerio'),
                 lider: formData.get('lider'),
@@ -465,20 +497,38 @@
             return data;
         }
 
-        function saveToDB(data) {
+        async function saveToCloud(data) {
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    body: JSON.stringify(data),
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const result = await response.json();
+                return result.result === 'success';
+            } catch (error) {
+                console.error('Error al guardar en la nube:', error);
+                return false;
+            }
+        }
+
+        function saveLocal(data) {
             const registros = JSON.parse(localStorage.getItem(DB_KEY)) || [];
-            registros.unshift(data);
+            registros.push(data);
             localStorage.setItem(DB_KEY, JSON.stringify(registros));
         }
 
-        function showMessage(text, type) {
+        function showMessage(text, type, duration = 4000) {
             const msgDiv = document.getElementById('message');
             msgDiv.textContent = text;
             msgDiv.className = `message ${type}`;
             msgDiv.style.display = 'block';
             setTimeout(() => {
                 msgDiv.style.display = 'none';
-            }, 4000);
+            }, duration);
         }
 
         function limpiarFormulario() {
@@ -500,41 +550,82 @@
             document.getElementById('fechaHasta').valueAsDate = finSemana;
         }
 
-        document.getElementById('controlForm').addEventListener('submit', function(e) {
+        // Verificar si la URL está configurada
+        function checkConfig() {
+            if (API_URL.includes('xxxxxxxx')) {
+                showMessage('⚠️ ERROR: Debes configurar la URL de Google Apps Script en el código', 'error', 10000);
+                return false;
+            }
+            return true;
+        }
+
+        document.getElementById('controlForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            const btn = document.querySelector('.btn-primary');
+            if (!checkConfig()) return;
+            
+            const btn = document.getElementById('submitBtn');
             const originalText = btn.innerHTML;
-            btn.innerHTML = '💾 Guardando...';
+            btn.innerHTML = 'Guardando<span class="spinner"></span>';
             btn.disabled = true;
 
-            setTimeout(() => {
-                const data = getFormData();
-                
-                if (data.actividades.length === 0) {
-                    showMessage('⚠️ Debe completar al menos una actividad', 'error');
-                    btn.innerHTML = originalText;
-                    btn.disabled = false;
-                    return;
-                }
+            const data = getFormData();
+            
+            if (data.actividades.length === 0) {
+                showMessage('⚠️ Debe completar al menos una actividad', 'error');
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                return;
+            }
 
-                saveToDB(data);
-                showMessage('✅ ¡Control semanal guardado exitosamente! Dios bendiga su ministerio.', 'success');
+            // Intentar guardar en la nube
+            const saved = await saveToCloud(data);
+            
+            if (saved) {
+                showMessage('✅ ¡Datos guardados en la nube exitosamente! Dios bendiga su ministerio.', 'success');
                 
                 setTimeout(() => {
                     document.getElementById('controlForm').reset();
                     generateTableRows();
                     setDefaultDates();
                 }, 2000);
-                
-                btn.innerHTML = originalText;
-                btn.disabled = false;
-            }, 600);
+            } else {
+                // Fallback a modo offline
+                saveLocal(data);
+                document.getElementById('offlineMessage').style.display = 'block';
+                showMessage('⚠️ Modo offline: Datos guardados localmente. Se enviarán cuando haya conexión.', 'warning', 6000);
+            }
+            
+            btn.innerHTML = originalText;
+            btn.disabled = false;
         });
+
+        // Intentar enviar datos pendientes al cargar
+        async function syncPendingData() {
+            const pendientes = JSON.parse(localStorage.getItem(DB_KEY)) || [];
+            if (pendientes.length === 0) return;
+            
+            let enviados = 0;
+            for (const data of pendientes) {
+                const saved = await saveToCloud(data);
+                if (saved) enviados++;
+            }
+            
+            if (enviados > 0) {
+                localStorage.setItem(DB_KEY, JSON.stringify([]));
+                showMessage(`✅ ${enviados} registro(s) pendiente(s) sincronizado(s) con la nube`, 'success');
+                document.getElementById('offlineMessage').style.display = 'none';
+            }
+        }
 
         initDB();
         generateTableRows();
         setDefaultDates();
+        
+        // Intentar sincronizar al cargar
+        if (checkConfig()) {
+            syncPendingData();
+        }
     </script>
 </body>
 </html>
