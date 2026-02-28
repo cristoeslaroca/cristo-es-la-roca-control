@@ -424,8 +424,8 @@
     </div>
 
     <script>
-        // ⚠️⚠️⚠️ REEMPLAZA ESTA URL CON LA TUYA DE GOOGLE APPS SCRIPT ⚠️⚠️⚠️
-        const API_URL = 'https://script.google.com/macros/s/AKfycbzxxxxxxxxxxxxxxxxxxxxxxxx/exec';
+        // ✅ TU URL DE GOOGLE APPS SCRIPT
+        const API_URL = 'https://script.google.com/macros/s/AKfycbzdG83hhyvUv-b3n4BuJRT7GgtoRH81WEq3SReBXRbBQfrcxtef0E4rZxZ1ktTLz8h9/exec';
         
         const DB_KEY = 'cristo_es_la_roca_offline';
         
@@ -550,19 +550,8 @@
             document.getElementById('fechaHasta').valueAsDate = finSemana;
         }
 
-        // Verificar si la URL está configurada
-        function checkConfig() {
-            if (API_URL.includes('xxxxxxxx')) {
-                showMessage('⚠️ ERROR: Debes configurar la URL de Google Apps Script en el código', 'error', 10000);
-                return false;
-            }
-            return true;
-        }
-
         document.getElementById('controlForm').addEventListener('submit', async function(e) {
             e.preventDefault();
-            
-            if (!checkConfig()) return;
             
             const btn = document.getElementById('submitBtn');
             const originalText = btn.innerHTML;
@@ -621,11 +610,7 @@
         initDB();
         generateTableRows();
         setDefaultDates();
-        
-        // Intentar sincronizar al cargar
-        if (checkConfig()) {
-            syncPendingData();
-        }
+        syncPendingData();
     </script>
 </body>
 </html>
