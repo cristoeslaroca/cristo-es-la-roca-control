@@ -86,6 +86,7 @@
         .btn-danger { background: #e74c3c; color: white; }
         .btn-warning { background: #f39c12; color: white; }
         .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+        .btn-small { padding: 5px 10px; font-size: 0.8rem; }
         .data-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
         .data-table th { background: #f8f9fa; padding: 15px; text-align: left; font-weight: 600; color: #2c3e50; border-bottom: 2px solid #e0e0e0; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.5px; }
         .data-table td { padding: 15px; border-bottom: 1px solid #e0e0e0; }
@@ -132,6 +133,18 @@
         .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); display: none; justify-content: center; align-items: center; z-index: 3000; }
         .loading-spinner { width: 60px; height: 60px; border: 5px solid #f3f3f3; border-top: 5px solid #2a5298; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* Estilos para botones de eliminar */
+        .btn-eliminar { background: #dc3545; color: white; }
+        .btn-eliminar:hover { background: #c82333; }
+        .acciones-cell { display: flex; gap: 5px; }
+        
+        /* Modal de confirmación */
+        .confirm-modal { max-width: 400px; text-align: center; }
+        .confirm-modal h3 { margin-bottom: 20px; color: #dc3545; }
+        .confirm-modal p { margin-bottom: 20px; color: #666; }
+        .confirm-modal .btn-container { display: flex; gap: 10px; justify-content: center; }
+        
         @media print { .sidebar, .top-bar, .btn, .modal, .loading-overlay { display: none !important; } .main-content { margin-left: 0; } .card { box-shadow: none; border: 1px solid #ddd; page-break-inside: avoid; } }
         @media (max-width: 1024px) { .sidebar { transform: translateX(-100%); transition: transform 0.3s; } .sidebar.open { transform: translateX(0); } .main-content { margin-left: 0; } }
     </style>
@@ -179,7 +192,7 @@
                 <li><a href="#" onclick="showSection('metas')">🎯 Cumplimiento de Metas</a></li>
                 <li><a href="#" onclick="showSection('configuracion')">⚙️ Configuración</a></li>
                 <li><a href="#" onclick="exportarDatos()">📥 Exportar a Excel</a></li>
-                <li><a href="#" onclick="limpiarTodo()" style="color: #ff6b6b;">🗑️ Limpiar Todo</a></li>
+                <li><a href="#" onclick="mostrarEliminarTodos()" style="color: #ff6b6b;">🗑️ Eliminar TODOS los registros</a></li>
             </ul>
         </div>
 
@@ -343,9 +356,37 @@
         </div>
     </div>
 
+    <!-- Modal de Confirmación Eliminar -->
+    <div id="confirmModal" class="modal">
+        <div class="modal-content confirm-modal">
+            <h3>⚠️ Confirmar Eliminación</h3>
+            <p id="confirmMessage">¿Está seguro de que desea eliminar este registro?</p>
+            <div class="btn-container">
+                <button class="btn btn-secondary" onclick="cerrarConfirmModal()">Cancelar</button>
+                <button class="btn btn-danger" id="confirmBtn" onclick="">Sí, Eliminar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Contraseña para Eliminar Todos -->
+    <div id="passwordModal" class="modal">
+        <div class="modal-content confirm-modal">
+            <h3>🗑️ Eliminar TODOS los registros</h3>
+            <p>Esta acción NO se puede deshacer. Ingrese la contraseña de seguridad:</p>
+            <div class="input-group" style="margin: 20px 0;">
+                <input type="password" id="deletePassword" placeholder="Contraseña de seguridad" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 5px;">
+            </div>
+            <p style="font-size: 0.85rem; color: #666; margin-bottom: 15px;">Contraseña por defecto: <code>cristo2024eliminar</code></p>
+            <div class="btn-container">
+                <button class="btn btn-secondary" onclick="cerrarPasswordModal()">Cancelar</button>
+                <button class="btn btn-danger" onclick="confirmarEliminarTodos()">Eliminar TODO</button>
+            </div>
+        </div>
+    </div>
+
     <script>
-        // ✅ REEMPLAZA CON TU NUEVA URL DESPUÉS DE CREAR LA IMPLEMENTACIÓN
-        const API_URL = 'https://script.google.com/macros/s/AKfycbzhlBolcIpKQYAvDdL5Xa23zeznejSq6TsZIcSunxo_WaytYzyGqjLP1vnmkmMbx9xp/exec';
+        // ✅ REEMPLAZA CON TU NUEVA URL
+        const API_URL = 'https://script.google.com/macros/s/AKfycbzdG83hhyvUv-b3n4BuJRT7GgtoRH81WEq3SReBXRbBQfrcxtef0E4rZxZ1ktTLz8h9/exec';
         
         const USERS_KEY = 'cristo_roca_users';
         const DEFAULT_USERS = {
@@ -358,6 +399,7 @@
         let users = {};
         let datosGlobales = [];
         let datosEnLinea = false;
+        let idAEliminar = null;
         
         const MINISTERIOS = [
             "Ministerio de Evangelismo y Crecimiento",
@@ -428,40 +470,30 @@
             location.reload();
         }
 
-        // ✅ CARGAR DATOS VÍA JSONP (nunca falla por CORS)
+        // CARGAR DATOS
         async function cargarDatos() {
             showLoading(true);
             datosEnLinea = false;
-            
-            console.log('Intentando cargar datos vía JSONP...');
             
             try {
                 const resultado = await cargarJSONP();
                 
                 if (resultado.success && resultado.data) {
-                    console.log('Datos cargados desde Google Sheets:', resultado.data.length, 'registros');
                     datosGlobales = transformarDatos(resultado.data);
                     datosEnLinea = true;
                     updateConnectionStatus('online');
-                    
-                    // Guardar en caché local
                     localStorage.setItem('cristo_es_la_roca_cache', JSON.stringify(datosGlobales));
                 } else {
                     throw new Error('No se pudieron cargar datos');
                 }
             } catch (error) {
-                console.log('Error cargando desde Sheets:', error);
-                
-                // Usar caché local si existe
                 const cache = localStorage.getItem('cristo_es_la_roca_cache');
                 const localData = localStorage.getItem('cristo_es_la_roca_offline');
                 
                 if (cache) {
-                    console.log('Usando caché local');
                     datosGlobales = JSON.parse(cache);
                     updateConnectionStatus('local');
                 } else if (localData) {
-                    console.log('Usando datos offline');
                     datosGlobales = JSON.parse(localData);
                     updateConnectionStatus('offline');
                 } else {
@@ -474,17 +506,14 @@
             actualizarTodo();
         }
 
-        // Función JSONP para cargar datos
         function cargarJSONP() {
             return new Promise((resolve) => {
                 const callbackName = 'loadCallback_' + Date.now();
                 const script = document.createElement('script');
                 
                 const url = `${API_URL}?callback=${callbackName}&_=${Date.now()}`;
-                console.log('Cargando:', url);
                 
                 const timeout = setTimeout(() => {
-                    console.log('Timeout cargando datos');
                     cleanup();
                     resolve({success: false, error: 'timeout'});
                 }, 10000);
@@ -496,9 +525,7 @@
                 }
                 
                 window[callbackName] = function(data) {
-                    console.log('Respuesta recibida:', Array.isArray(data) ? data.length + ' items' : typeof data);
                     cleanup();
-                    
                     if (Array.isArray(data)) {
                         resolve({success: true, data: data});
                     } else if (data && data.error) {
@@ -509,7 +536,6 @@
                 };
                 
                 script.onerror = () => {
-                    console.log('Error de red cargando datos');
                     cleanup();
                     resolve({success: false, error: 'network'});
                 };
@@ -523,13 +549,12 @@
             const agrupados = {};
             
             sheetsData.forEach(row => {
-                // Normalizar nombres de campos
                 const id = row.ID || row.id || Date.now();
                 const ministerio = row.Ministerio || row.ministerio || '';
                 const lider = row.Lider || row.lider || '';
-                const fechaDesde = row['Fecha Desde'] || row.fechaDesde || row.fecha_desde || '';
-                const fechaHasta = row['Fecha Hasta'] || row.fechaHasta || row.fecha_hasta || '';
-                const fechaRegistro = row['Fecha Registro'] || row.fechaRegistro || row.fecha_registro || new Date().toISOString();
+                const fechaDesde = row['Fecha Desde'] || row.fechaDesde || '';
+                const fechaHasta = row['Fecha Hasta'] || row.fechaHasta || '';
+                const fechaRegistro = row['Fecha Registro'] || row.fechaRegistro || new Date().toISOString();
                 
                 const key = `${lider}_${fechaDesde}`;
                 
@@ -545,17 +570,16 @@
                     };
                 }
                 
-                // Solo agregar si hay actividad
                 const actividad = row.Actividad || row.actividad;
-                if (actividad || row['Fecha Actividad'] || row.fechaActividad) {
+                if (actividad || row['Fecha Actividad']) {
                     agrupados[key].actividades.push({
-                        fecha: row['Fecha Actividad'] || row.fechaActividad || row.fecha_actividad || '',
+                        fecha: row['Fecha Actividad'] || row.fechaActividad || '',
                         actividad: actividad || '',
                         meta: row.Meta || row.meta || '',
                         participantes: parseInt(row.Participantes || row.participantes) || 0,
                         ausentes: parseInt(row.Ausentes || row.ausentes) || 0,
                         ofrenda: parseFloat(row.Ofrenda || row.ofrenda) || 0,
-                        cumplida: row['Meta Cumplida'] || row.metaCumplida || row.cumplida || '',
+                        cumplida: row['Meta Cumplida'] || row.metaCumplida || '',
                         resultados: row.Resultados || row.resultados || '',
                         observaciones: row.Observaciones || row.observaciones || ''
                     });
@@ -583,6 +607,169 @@
         function showLoading(show) {
             document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none';
         }
+
+        // ==================== FUNCIONES DE ELIMINACIÓN ====================
+
+        // Mostrar modal para eliminar un registro
+        function mostrarEliminar(id) {
+            idAEliminar = id;
+            const reg = datosGlobales.find(r => r.id == id);
+            document.getElementById('confirmMessage').innerHTML = 
+                `¿Está seguro de eliminar el registro de <strong>${reg ? reg.lider : 'este líder'}</strong>?<br><small>Esta acción no se puede deshacer.</small>`;
+            document.getElementById('confirmBtn').onclick = confirmarEliminar;
+            document.getElementById('confirmModal').style.display = 'flex';
+        }
+
+        // Cerrar modal de confirmación
+        function cerrarConfirmModal() {
+            document.getElementById('confirmModal').style.display = 'none';
+            idAEliminar = null;
+        }
+
+        // Confirmar eliminación de un registro
+        async function confirmarEliminar() {
+            if (!idAEliminar) return;
+            
+            cerrarConfirmModal();
+            showLoading(true);
+            
+            try {
+                const resultado = await eliminarRegistroJSONP(idAEliminar);
+                
+                if (resultado.success) {
+                    showAlert('✅ Registro eliminado correctamente', 'success');
+                    // Recargar datos
+                    await cargarDatos();
+                } else {
+                    showAlert('❌ Error al eliminar: ' + resultado.error, 'error');
+                }
+            } catch (error) {
+                showAlert('❌ Error de conexión al eliminar', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Eliminar registro vía JSONP
+        function eliminarRegistroJSONP(id) {
+            return new Promise((resolve) => {
+                const callbackName = 'deleteCallback_' + Date.now();
+                const script = document.createElement('script');
+                
+                const url = `${API_URL}?callback=${callbackName}&action=eliminar&id=${id}&_=${Date.now()}`;
+                
+                const timeout = setTimeout(() => {
+                    cleanup();
+                    resolve({success: false, error: 'timeout'});
+                }, 10000);
+                
+                function cleanup() {
+                    clearTimeout(timeout);
+                    if (script.parentNode) script.parentNode.removeChild(script);
+                    delete window[callbackName];
+                }
+                
+                window[callbackName] = function(response) {
+                    cleanup();
+                    if (response && response.result === 'success') {
+                        resolve({success: true, data: response});
+                    } else {
+                        resolve({success: false, error: response ? response.message : 'Error desconocido'});
+                    }
+                };
+                
+                script.onerror = () => {
+                    cleanup();
+                    resolve({success: false, error: 'network'});
+                };
+                
+                script.src = url;
+                document.head.appendChild(script);
+            });
+        }
+
+        // Mostrar modal para eliminar TODOS
+        function mostrarEliminarTodos() {
+            document.getElementById('passwordModal').style.display = 'flex';
+            document.getElementById('deletePassword').value = '';
+            document.getElementById('deletePassword').focus();
+        }
+
+        // Cerrar modal de contraseña
+        function cerrarPasswordModal() {
+            document.getElementById('passwordModal').style.display = 'none';
+        }
+
+        // Confirmar eliminar TODOS
+        async function confirmarEliminarTodos() {
+            const password = document.getElementById('deletePassword').value;
+            
+            if (!password) {
+                alert('Ingrese la contraseña de seguridad');
+                return;
+            }
+            
+            cerrarPasswordModal();
+            showLoading(true);
+            
+            try {
+                const resultado = await eliminarTodosJSONP(password);
+                
+                if (resultado.success) {
+                    showAlert('✅ Todos los registros han sido eliminados', 'success');
+                    // Limpiar caché local también
+                    localStorage.removeItem('cristo_es_la_roca_cache');
+                    localStorage.removeItem('cristo_es_la_roca_offline');
+                    await cargarDatos();
+                } else {
+                    showAlert('❌ ' + resultado.error, 'error');
+                }
+            } catch (error) {
+                showAlert('❌ Error de conexión', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Eliminar todos vía JSONP
+        function eliminarTodosJSONP(password) {
+            return new Promise((resolve) => {
+                const callbackName = 'deleteAllCallback_' + Date.now();
+                const script = document.createElement('script');
+                
+                const url = `${API_URL}?callback=${callbackName}&action=eliminarTodos&password=${encodeURIComponent(password)}&_=${Date.now()}`;
+                
+                const timeout = setTimeout(() => {
+                    cleanup();
+                    resolve({success: false, error: 'timeout'});
+                }, 15000);
+                
+                function cleanup() {
+                    clearTimeout(timeout);
+                    if (script.parentNode) script.parentNode.removeChild(script);
+                    delete window[callbackName];
+                }
+                
+                window[callbackName] = function(response) {
+                    cleanup();
+                    if (response && response.result === 'success') {
+                        resolve({success: true, data: response});
+                    } else {
+                        resolve({success: false, error: response ? response.message : 'Error desconocido'});
+                    }
+                };
+                
+                script.onerror = () => {
+                    cleanup();
+                    resolve({success: false, error: 'network'});
+                };
+                
+                script.src = url;
+                document.head.appendChild(script);
+            });
+        }
+
+        // ==================== FIN FUNCIONES DE ELIMINACIÓN ====================
 
         function actualizarTodo() {
             actualizarStats();
@@ -698,7 +885,10 @@
                         <td>${totalPart}</td>
                         <td>$${totalOfrenda.toFixed(2)}</td>
                         <td><span class="badge ${metasCum === metasTot && metasTot > 0 ? 'badge-success' : metasCum > 0 ? 'badge-warning' : 'badge-danger'}">${metasCum}/${metasTot}</span></td>
-                        <td><button class="btn btn-primary" onclick="verDetalle('${reg.id}')" style="padding: 5px 10px; font-size: 0.8rem;">Ver</button></td>
+                        <td class="acciones-cell">
+                            <button class="btn btn-primary btn-small" onclick="verDetalle('${reg.id}')">Ver</button>
+                            <button class="btn btn-eliminar btn-small" onclick="mostrarEliminar('${reg.id}')">🗑️</button>
+                        </td>
                     </tr>
                 `;
             }).join('');
@@ -900,7 +1090,6 @@
             const ministerio = document.getElementById('filterMinisterio').value;
             const mes = document.getElementById('filterMes').value;
             
-            // Recargar datos base
             cargarDatos().then(() => {
                 if (ministerio) {
                     datosGlobales = datosGlobales.filter(r => r.ministerio === ministerio);
@@ -957,9 +1146,17 @@
                         `).join('') : '<tr><td colspan="7">Sin actividades</td></tr>'}
                     </tbody>
                 </table>
+                <div style="margin-top: 20px; text-align: center;">
+                    <button class="btn btn-eliminar" onclick="cerrarModalYMostrarEliminar('${reg.id}')">🗑️ Eliminar este registro</button>
+                </div>
             `;
             
             document.getElementById('detailModal').style.display = 'flex';
+        }
+
+        function cerrarModalYMostrarEliminar(id) {
+            closeModal();
+            setTimeout(() => mostrarEliminar(id), 300);
         }
 
         function closeModal(e) {
@@ -1267,17 +1464,6 @@
             link.href = URL.createObjectURL(blob);
             link.download = `reporte_cristo_es_la_roca_${new Date().toISOString().split('T')[0]}.csv`;
             link.click();
-        }
-
-        function limpiarTodo() {
-            if (confirm('⚠️ ¿ESTÁ SEGURO DE ELIMINAR TODOS LOS DATOS LOCALES?')) {
-                if (confirm('Confirme nuevamente: ¿Desea borrar permanentemente todos los registros locales?')) {
-                    localStorage.removeItem('cristo_es_la_roca_offline');
-                    localStorage.removeItem('cristo_es_la_roca_cache');
-                    cargarDatos();
-                    alert('Datos locales eliminados.');
-                }
-            }
         }
 
         function showSection(sectionId) {
