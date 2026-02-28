@@ -220,6 +220,7 @@
             display: flex;
             gap: 15px;
             flex-wrap: wrap;
+            align-items: center;
         }
 
         .filters select, .filters input {
@@ -227,6 +228,33 @@
             border: 2px solid #e0e0e0;
             border-radius: 8px;
             font-size: 0.9rem;
+        }
+
+        .connection-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .connection-online {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .connection-offline {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
         }
 
         .stats-grid {
@@ -603,7 +631,6 @@
             font-size: 1.1rem;
         }
 
-        /* ESTILOS PARA CAMBIO DE CONTRASEÑA */
         .password-form {
             max-width: 500px;
             margin: 0 auto;
@@ -709,8 +736,35 @@
             color: #7f8c8d;
         }
 
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255,255,255,0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 3000;
+        }
+
+        .loading-spinner {
+            width: 60px;
+            height: 60px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #2a5298;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
         @media print {
-            .sidebar, .top-bar, .btn, .modal { display: none !important; }
+            .sidebar, .top-bar, .btn, .modal, .loading-overlay { display: none !important; }
             .main-content { margin-left: 0; }
             .card { box-shadow: none; border: 1px solid #ddd; page-break-inside: avoid; }
         }
@@ -755,6 +809,11 @@
         </div>
     </div>
 
+    <!-- LOADING OVERLAY -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+    </div>
+
     <!-- MAIN APP -->
     <div id="appContainer" class="app-container">
         <div class="sidebar">
@@ -786,12 +845,18 @@
             <div id="dashboard" class="section active">
                 <div class="top-bar">
                     <h2>Dashboard General</h2>
-                    <div class="filters">
-                        <select id="filterMinisterio" onchange="filtrarDatos()">
-                            <option value="">Todos los Ministerios</option>
-                        </select>
-                        <input type="month" id="filterMes" onchange="filtrarDatos()">
-                        <button class="btn btn-success" onclick="generarPDF('dashboard')">📄 PDF</button>
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <div id="connectionStatus" class="connection-status connection-offline">
+                            <span class="status-dot"></span>
+                            <span>Cargando...</span>
+                        </div>
+                        <div class="filters">
+                            <select id="filterMinisterio" onchange="filtrarDatos()">
+                                <option value="">Todos los Ministerios</option>
+                            </select>
+                            <input type="month" id="filterMes" onchange="filtrarDatos()">
+                            <button class="btn btn-success" onclick="generarPDF('dashboard')">📄 PDF</button>
+                        </div>
                     </div>
                 </div>
 
@@ -909,7 +974,7 @@
                 </div>
             </div>
 
-            <!-- SECCIÓN CONFIGURACIÓN (CAMBIO DE CONTRASEÑA) -->
+            <!-- SECCIÓN CONFIGURACIÓN -->
             <div id="configuracion" class="section">
                 <div class="top-bar">
                     <h2>⚙️ Configuración del Sistema</h2>
@@ -919,9 +984,7 @@
                     <div class="card-header">
                         <h3 class="card-title">👥 Usuarios del Sistema</h3>
                     </div>
-                    <div class="user-list" id="userList">
-                        <!-- Lista de usuarios generada dinámicamente -->
-                    </div>
+                    <div class="user-list" id="userList"></div>
                 </div>
 
                 <div class="card">
@@ -987,10 +1050,11 @@
     </div>
 
     <script>
-        // CONFIGURACIÓN DE SEGURIDAD
-        const USERS_KEY = 'cristo_roca_users';
+        // ⚠️⚠️⚠️ REEMPLAZA ESTA URL CON LA TUYA DE GOOGLE APPS SCRIPT ⚠️⚠️⚠️
+        const API_URL = 'https://script.google.com/macros/s/AKfycbzxxxxxxxxxxxxxxxxxxxxxxxx/exec';
         
-        // Usuarios por defecto (se guardarán en localStorage)
+        // CONFIGURACIÓN DE USUARIOS
+        const USERS_KEY = 'cristo_roca_users';
         const DEFAULT_USERS = {
             'admin': { password: 'cristo2024', role: 'Administrador', name: 'Administrador' },
             'pastor': { password: 'rocafirme2024', role: 'Pastor', name: 'Pastor' },
@@ -999,7 +1063,8 @@
 
         let currentUser = null;
         let users = {};
-        const DB_KEY = 'cristo_es_la_roca_db';
+        let datosGlobales = [];
+        
         const MINISTERIOS = [
             "Ministerio de Evangelismo y Crecimiento",
             "Ministerio de Edificación",
@@ -1009,11 +1074,8 @@
             "Ministerio de Integración y Bienestar"
         ];
 
-        let datosGlobales = [];
-
         // INICIALIZAR SISTEMA
         function initSystem() {
-            // Cargar usuarios de localStorage o usar defaults
             const savedUsers = localStorage.getItem(USERS_KEY);
             if (savedUsers) {
                 users = JSON.parse(savedUsers);
@@ -1066,8 +1128,14 @@
             document.getElementById('loginScreen').style.display = 'none';
             document.getElementById('appContainer').style.display = 'block';
             document.getElementById('currentUser').textContent = users[currentUser].name;
-            cargarDatos();
-            actualizarListaUsuarios();
+            
+            if (checkConfig()) {
+                cargarDatos();
+            } else {
+                // Si no hay URL configurada, mostrar datos de ejemplo
+                datosGlobales = [];
+                actualizarTodo();
+            }
         }
 
         function logout() {
@@ -1075,92 +1143,89 @@
             location.reload();
         }
 
-        // CAMBIO DE CONTRASEÑA
-        function validarRequisitos() {
-            const password = document.getElementById('newPassword').value;
-            
-            const hasLength = password.length >= 6;
-            const hasNumber = /\d/.test(password);
-            const hasUpper = /[A-Z]/.test(password);
-            const hasLower = /[a-z]/.test(password);
-            
-            document.getElementById('req-length').className = hasLength ? 'valid' : '';
-            document.getElementById('req-number').className = hasNumber ? 'valid' : '';
-            document.getElementById('req-upper').className = hasUpper ? 'valid' : '';
-            document.getElementById('req-lower').className = hasLower ? 'valid' : '';
-            
-            return hasLength && hasNumber && hasUpper && hasLower;
+        function checkConfig() {
+            if (API_URL.includes('xxxxxxxx')) {
+                console.warn('API_URL no configurada');
+                return false;
+            }
+            return true;
         }
 
-        function cambiarPassword() {
-            const currentPass = document.getElementById('currentPassword').value;
-            const newPass = document.getElementById('newPassword').value;
-            const confirmPass = document.getElementById('confirmPassword').value;
+        // CARGAR DATOS DESDE GOOGLE SHEETS
+        async function cargarDatos() {
+            showLoading(true);
             
-            // Validar contraseña actual
-            if (currentPass !== users[currentUser].password) {
-                showAlert('❌ La contraseña actual es incorrecta', 'error');
-                return;
+            try {
+                const response = await fetch(API_URL);
+                const data = await response.json();
+                
+                if (Array.isArray(data)) {
+                    datosGlobales = transformarDatosSheets(data);
+                    updateConnectionStatus(true);
+                } else {
+                    throw new Error('Formato incorrecto');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                // Fallback a localStorage
+                const localData = JSON.parse(localStorage.getItem('cristo_es_la_roca_offline')) || [];
+                datosGlobales = localData;
+                updateConnectionStatus(false);
+            } finally {
+                showLoading(false);
+                actualizarTodo();
             }
-            
-            // Validar requisitos
-            if (!validarRequisitos()) {
-                showAlert('❌ La nueva contraseña no cumple con todos los requisitos', 'error');
-                return;
-            }
-            
-            // Validar coincidencia
-            if (newPass !== confirmPass) {
-                showAlert('❌ Las contraseñas nuevas no coinciden', 'error');
-                return;
-            }
-            
-            // Cambiar contraseña
-            users[currentUser].password = newPass;
-            saveUsers();
-            
-            // Limpiar formulario
-            document.getElementById('passwordForm').reset();
-            document.querySelectorAll('.password-requirements li').forEach(li => li.className = '');
-            
-            showAlert('✅ Contraseña cambiada exitosamente', 'success');
         }
 
-        function showAlert(message, type) {
-            const alertDiv = document.getElementById('alertMessage');
-            alertDiv.textContent = message;
-            alertDiv.className = 'alert alert-' + type;
-            alertDiv.style.display = 'block';
+        function transformarDatosSheets(sheetsData) {
+            const agrupados = {};
             
-            setTimeout(() => {
-                alertDiv.style.display = 'none';
-            }, 5000);
-        }
-
-        function actualizarListaUsuarios() {
-            const container = document.getElementById('userList');
-            container.innerHTML = '<h4>Usuarios Registrados</h4>';
-            
-            Object.entries(users).forEach(([username, data]) => {
-                const isCurrent = username === currentUser;
-                container.innerHTML += `
-                    <div class="user-item" style="${isCurrent ? 'border-left-color: #27ae60; background: #f0fff4;' : ''}">
-                        <div>
-                            <div class="user-name">${data.name} ${isCurrent ? '(Tú)' : ''}</div>
-                            <div class="user-role">${data.role} | Usuario: ${username}</div>
-                        </div>
-                        ${isCurrent ? '<span style="color: #27ae60; font-size: 0.85rem;">✓ Sesión activa</span>' : ''}
-                    </div>
-                `;
+            sheetsData.forEach(row => {
+                const key = `${row.Lider}_${row['Fecha Desde']}_${row['Fecha Hasta']}`;
+                if (!agrupados[key]) {
+                    agrupados[key] = {
+                        id: row.ID || Date.now(),
+                        ministerio: row.Ministerio,
+                        lider: row.Lider,
+                        fechaDesde: row['Fecha Desde'],
+                        fechaHasta: row['Fecha Hasta'],
+                        fechaRegistro: row['Fecha Registro'],
+                        actividades: []
+                    };
+                }
+                
+                agrupados[key].actividades.push({
+                    fecha: row['Fecha Actividad'],
+                    actividad: row.Actividad,
+                    meta: row.Meta,
+                    participantes: parseInt(row.Participantes) || 0,
+                    ausentes: parseInt(row.Ausentes) || 0,
+                    ofrenda: parseFloat(row.Ofrenda) || 0,
+                    cumplida: row['Meta Cumplida'],
+                    resultados: row.Resultados,
+                    observaciones: row.Observaciones
+                });
             });
+            
+            return Object.values(agrupados);
         }
 
-        // RESTO DE FUNCIONES (cargarDatos, actualizarStats, etc.)
-        function cargarDatos() {
-            datosGlobales = JSON.parse(localStorage.getItem(DB_KEY)) || [];
-            actualizarTodo();
+        function updateConnectionStatus(online) {
+            const statusEl = document.getElementById('connectionStatus');
+            if (online) {
+                statusEl.className = 'connection-status connection-online';
+                statusEl.innerHTML = '<span class="status-dot"></span><span>Conectado</span>';
+            } else {
+                statusEl.className = 'connection-status connection-offline';
+                statusEl.innerHTML = '<span class="status-dot"></span><span>Offline</span>';
+            }
         }
 
+        function showLoading(show) {
+            document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none';
+        }
+
+        // ACTUALIZAR TODAS LAS VISTAS
         function actualizarTodo() {
             actualizarStats();
             actualizarMinisterios();
@@ -1514,25 +1579,27 @@
             const ministerio = document.getElementById('filterMinisterio').value;
             const mes = document.getElementById('filterMes').value;
             
-            datosGlobales = JSON.parse(localStorage.getItem(DB_KEY)) || [];
-            
-            if (ministerio) {
-                datosGlobales = datosGlobales.filter(r => r.ministerio === ministerio);
-            }
-            
-            if (mes) {
-                datosGlobales = datosGlobales.filter(r => {
-                    const fecha = new Date(r.fechaDesde);
-                    return fecha.toISOString().startsWith(mes);
-                });
-            }
-            
-            actualizarStats();
-            generarGraficoOfrendas();
+            // Recargar datos originales y filtrar
+            cargarDatos().then(() => {
+                if (ministerio) {
+                    datosGlobales = datosGlobales.filter(r => r.ministerio === ministerio);
+                }
+                
+                if (mes) {
+                    datosGlobales = datosGlobales.filter(r => {
+                        const fecha = new Date(r.fechaDesde);
+                        return fecha.toISOString().startsWith(mes);
+                    });
+                }
+                
+                actualizarStats();
+                actualizarRegistros();
+                generarGraficoOfrendas();
+            });
         }
 
         function verDetalle(id) {
-            const reg = datosGlobales.find(r => r.id === id);
+            const reg = datosGlobales.find(r => r.id == id);
             if (!reg) return;
 
             const totalOfrenda = reg.actividades.reduce((s, a) => s + (a.ofrenda || 0), 0);
@@ -1614,14 +1681,90 @@
         }
 
         function eliminarRegistro(id) {
-            if (confirm('¿Está seguro de eliminar este registro permanentemente?')) {
-                let datos = JSON.parse(localStorage.getItem(DB_KEY)) || [];
+            if (confirm('¿Está seguro de eliminar este registro? (Nota: Esto solo eliminará del almacenamiento local. Para eliminar de Google Sheets, debe hacerlo manualmente en la hoja de cálculo)')) {
+                let datos = JSON.parse(localStorage.getItem('cristo_es_la_roca_offline')) || [];
                 datos = datos.filter(r => r.id !== id);
-                localStorage.setItem(DB_KEY, JSON.stringify(datos));
+                localStorage.setItem('cristo_es_la_roca_offline', JSON.stringify(datos));
                 cargarDatos();
             }
         }
 
+        // CAMBIO DE CONTRASEÑA
+        function validarRequisitos() {
+            const password = document.getElementById('newPassword').value;
+            
+            const hasLength = password.length >= 6;
+            const hasNumber = /\d/.test(password);
+            const hasUpper = /[A-Z]/.test(password);
+            const hasLower = /[a-z]/.test(password);
+            
+            document.getElementById('req-length').className = hasLength ? 'valid' : '';
+            document.getElementById('req-number').className = hasNumber ? 'valid' : '';
+            document.getElementById('req-upper').className = hasUpper ? 'valid' : '';
+            document.getElementById('req-lower').className = hasLower ? 'valid' : '';
+            
+            return hasLength && hasNumber && hasUpper && hasLower;
+        }
+
+        function cambiarPassword() {
+            const currentPass = document.getElementById('currentPassword').value;
+            const newPass = document.getElementById('newPassword').value;
+            const confirmPass = document.getElementById('confirmPassword').value;
+            
+            if (currentPass !== users[currentUser].password) {
+                showAlert('❌ La contraseña actual es incorrecta', 'error');
+                return;
+            }
+            
+            if (!validarRequisitos()) {
+                showAlert('❌ La nueva contraseña no cumple con todos los requisitos', 'error');
+                return;
+            }
+            
+            if (newPass !== confirmPass) {
+                showAlert('❌ Las contraseñas nuevas no coinciden', 'error');
+                return;
+            }
+            
+            users[currentUser].password = newPass;
+            saveUsers();
+            
+            document.getElementById('passwordForm').reset();
+            document.querySelectorAll('.password-requirements li').forEach(li => li.className = '');
+            
+            showAlert('✅ Contraseña cambiada exitosamente', 'success');
+        }
+
+        function showAlert(message, type) {
+            const alertDiv = document.getElementById('alertMessage');
+            alertDiv.textContent = message;
+            alertDiv.className = 'alert alert-' + type;
+            alertDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                alertDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        function actualizarListaUsuarios() {
+            const container = document.getElementById('userList');
+            container.innerHTML = '<h4>Usuarios Registrados</h4>';
+            
+            Object.entries(users).forEach(([username, data]) => {
+                const isCurrent = username === currentUser;
+                container.innerHTML += `
+                    <div class="user-item" style="${isCurrent ? 'border-left-color: #27ae60; background: #f0fff4;' : ''}">
+                        <div>
+                            <div class="user-name">${data.name} ${isCurrent ? '(Tú)' : ''}</div>
+                            <div class="user-role">${data.role} | Usuario: ${username}</div>
+                        </div>
+                        ${isCurrent ? '<span style="color: #27ae60; font-size: 0.85rem;">✓ Sesión activa</span>' : ''}
+                    </div>
+                `;
+            });
+        }
+
+        // GENERAR PDF
         function generarPDF(tipo) {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
@@ -1862,11 +2005,11 @@
         }
 
         function limpiarTodo() {
-            if (confirm('⚠️ ¿ESTÁ SEGURO DE ELIMINAR TODOS LOS DATOS? Esta acción no se puede deshacer.')) {
-                if (confirm('Confirme nuevamente: ¿Desea borrar permanentemente todos los registros?')) {
-                    localStorage.removeItem(DB_KEY);
+            if (confirm('⚠️ ¿ESTÁ SEGURO DE ELIMINAR TODOS LOS DATOS LOCALES?')) {
+                if (confirm('Confirme nuevamente: ¿Desea borrar permanentemente todos los registros locales?')) {
+                    localStorage.removeItem('cristo_es_la_roca_offline');
                     cargarDatos();
-                    alert('Todos los datos han sido eliminados');
+                    alert('Datos locales eliminados. Los datos en Google Sheets no se ven afectados.');
                 }
             }
         }
@@ -1878,7 +2021,6 @@
             document.querySelectorAll('.nav-menu a').forEach(a => a.classList.remove('active'));
             event.target.classList.add('active');
             
-            // Si es la sección de configuración, actualizar lista de usuarios
             if (sectionId === 'configuracion') {
                 actualizarListaUsuarios();
             }
