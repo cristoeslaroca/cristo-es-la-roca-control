@@ -135,9 +135,7 @@
         .loading-spinner { width: 60px; height: 60px; border: 5px solid #f3f3f3; border-top: 5px solid #2a5298; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
-        /* ============================================
-           ESTILOS PARA BOTONES DE ELIMINAR - NUEVO
-           ============================================ */
+        /* ESTILOS PARA BOTONES DE ELIMINAR */
         .btn-eliminar { 
             background: #dc3545; 
             color: white; 
@@ -203,7 +201,6 @@
                 <li><a href="#" onclick="showSection('metas')">🎯 Cumplimiento de Metas</a></li>
                 <li><a href="#" onclick="showSection('configuracion')">⚙️ Configuración</a></li>
                 <li><a href="#" onclick="exportarDatos()">📥 Exportar a Excel</a></li>
-                <!-- NUEVO: Opción para eliminar todos -->
                 <li><a href="#" onclick="mostrarEliminarTodos()" style="color: #ff6b6b;">🗑️ Eliminar TODOS los registros</a></li>
             </ul>
         </div>
@@ -368,9 +365,7 @@
         </div>
     </div>
 
-    <!-- ============================================
-         MODALES DE ELIMINACIÓN - NUEVOS
-         ============================================ -->
+    <!-- MODALES DE ELIMINACIÓN -->
     
     <!-- Modal de Confirmación Eliminar Uno -->
     <div id="confirmModal" class="modal">
@@ -379,7 +374,7 @@
             <p id="confirmMessage">¿Está seguro de que desea eliminar este registro?</p>
             <div class="btn-container">
                 <button class="btn btn-secondary" onclick="cerrarConfirmModal()">Cancelar</button>
-                <button class="btn btn-danger" id="confirmBtn" onclick="">Sí, Eliminar</button>
+                <button class="btn btn-danger" id="confirmBtn">Sí, Eliminar</button>
             </div>
         </div>
     </div>
@@ -402,7 +397,7 @@
 
     <script>
         // ✅ REEMPLAZA CON TU URL DE APPS SCRIPT
-       const API_URL = 'https://script.google.com/macros/s/AKfycbxpk8cDLYYm7UBnvPw8pLacCwfdMmc4OBGmfqBNFpiPx7BLtttUY8VNPmAx63ED8_5Z/exec';
+        const API_URL = 'https://script.google.com/macros/s/AKfycbxpk8cDLYYm7UBnvPw8pLacCwfdMmc4OBGmfqBNFpiPx7BLtttUY8VNPmAx63ED8_5Z/exec';
         
         const USERS_KEY = 'cristo_roca_users';
         const DEFAULT_USERS = {
@@ -576,7 +571,7 @@
                 
                 if (!agrupados[key]) {
                     agrupados[key] = {
-                        id: id,
+                        id: id.toString(), // Convertir ID a string
                         ministerio: ministerio,
                         lider: lider,
                         fechaDesde: fechaDesde,
@@ -625,16 +620,22 @@
         }
 
         // ============================================================
-        // FUNCIONES DE ELIMINACIÓN - NUEVAS
+        // FUNCIONES DE ELIMINACIÓN - CORREGIDAS
         // ============================================================
 
         // Mostrar modal para eliminar un registro
         function mostrarEliminar(id) {
-            idAEliminar = id;
-            const reg = datosGlobales.find(r => r.id == id);
+            idAEliminar = id.toString(); // Asegurar que sea string
+            const reg = datosGlobales.find(r => r.id === idAEliminar);
             document.getElementById('confirmMessage').innerHTML = 
                 `¿Está seguro de eliminar el registro de <strong>${reg ? reg.lider : 'este líder'}</strong>?<br><small>Esta acción no se puede deshacer.</small>`;
-            document.getElementById('confirmBtn').onclick = confirmarEliminar;
+            
+            // Configurar el botón de confirmación
+            const btnConfirmar = document.getElementById('confirmBtn');
+            btnConfirmar.onclick = function() {
+                confirmarEliminar();
+            };
+            
             document.getElementById('confirmModal').style.display = 'flex';
         }
 
@@ -646,39 +647,52 @@
 
         // Confirmar eliminación de un registro
         async function confirmarEliminar() {
-            if (!idAEliminar) return;
+            if (!idAEliminar) {
+                console.error('No hay ID para eliminar');
+                return;
+            }
             
+            console.log('Eliminando ID:', idAEliminar);
             cerrarConfirmModal();
             showLoading(true);
             
             try {
                 const resultado = await eliminarRegistroJSONP(idAEliminar);
+                console.log('Resultado:', resultado);
                 
                 if (resultado.success) {
                     showAlert('✅ Registro eliminado correctamente', 'success');
-                    await cargarDatos();
+                    // Esperar un momento antes de recargar para que Sheets actualice
+                    setTimeout(async () => {
+                        await cargarDatos();
+                    }, 1000);
                 } else {
-                    showAlert('❌ Error al eliminar: ' + resultado.error, 'error');
+                    showAlert('❌ Error al eliminar: ' + (resultado.error || 'Error desconocido'), 'error');
                 }
             } catch (error) {
+                console.error('Error en confirmarEliminar:', error);
                 showAlert('❌ Error de conexión al eliminar', 'error');
             } finally {
                 showLoading(false);
             }
         }
 
-        // Eliminar registro vía JSONP
+        // Eliminar registro vía JSONP - CORREGIDO
         function eliminarRegistroJSONP(id) {
             return new Promise((resolve) => {
                 const callbackName = 'deleteCallback_' + Date.now();
                 const script = document.createElement('script');
                 
-                const url = `${API_URL}?callback=${callbackName}&action=eliminar&id=${id}&_=${Date.now()}`;
+                // Asegurar que el ID sea string y codificarlo
+                const idString = id.toString();
+                const url = `${API_URL}?callback=${callbackName}&action=eliminar&id=${encodeURIComponent(idString)}&_=${Date.now()}`;
+                
+                console.log('URL de eliminación:', url);
                 
                 const timeout = setTimeout(() => {
                     cleanup();
                     resolve({success: false, error: 'timeout'});
-                }, 10000);
+                }, 15000);
                 
                 function cleanup() {
                     clearTimeout(timeout);
@@ -687,6 +701,7 @@
                 }
                 
                 window[callbackName] = function(response) {
+                    console.log('Respuesta del servidor:', response);
                     cleanup();
                     if (response && response.result === 'success') {
                         resolve({success: true, data: response});
@@ -736,7 +751,9 @@
                     showAlert('✅ Todos los registros han sido eliminados', 'success');
                     localStorage.removeItem('cristo_es_la_roca_cache');
                     localStorage.removeItem('cristo_es_la_roca_offline');
-                    await cargarDatos();
+                    setTimeout(async () => {
+                        await cargarDatos();
+                    }, 1000);
                 } else {
                     showAlert('❌ ' + resultado.error, 'error');
                 }
@@ -823,7 +840,7 @@
             const stats = [
                 { label: 'Total Registros', value: totalRegistros, icon: '📋', color: 'blue' },
                 { label: 'Total Actividades', value: totalActividades, icon: '📊', color: 'green' },
-                { label: 'Total Ofrendas', value: '$' + totalOfrendas.toFixed(2), icon: '💰', color: 'orange' },
+                { label: 'Total Ofrendas', value: 'Bs. ' + totalOfrendas.toFixed(2), icon: '💰', color: 'orange' },
                 { label: 'Total Participantes', value: totalParticipantes, icon: '👥', color: 'purple' },
                 { label: 'Promedio Cumplimiento', value: porcentajeCumplimiento + '%', icon: '🎯', color: 'teal' },
                 { label: 'Ministerios Activos', value: new Set(datosGlobales.map(r => r.ministerio).filter(Boolean)).size, icon: '⛪', color: 'red' }
@@ -877,7 +894,7 @@
                         <div class="mini-stat"><span class="mini-stat-label">Registros:</span><span class="mini-stat-value">${s.registros}</span></div>
                         <div class="mini-stat"><span class="mini-stat-label">Actividades:</span><span class="mini-stat-value">${s.actividades}</span></div>
                         <div class="mini-stat"><span class="mini-stat-label">Participantes:</span><span class="mini-stat-value">${s.participantes}</span></div>
-                        <div class="mini-stat"><span class="mini-stat-label">Ofrendas:</span><span class="mini-stat-value">$${s.ofrendas.toFixed(2)}</span></div>
+                        <div class="mini-stat"><span class="mini-stat-label">Ofrendas:</span><span class="mini-stat-value">Bs. ${s.ofrendas.toFixed(2)}</span></div>
                         <div class="mini-stat"><span class="mini-stat-label">Cumplimiento:</span><span class="mini-stat-value" style="color: ${porcentaje >= 70 ? '#27ae60' : porcentaje >= 40 ? '#f39c12' : '#e74c3c'}">${porcentaje}%</span></div>
                         <div class="progress-bar" style="margin-top: 10px;"><div class="progress-fill" style="width: ${porcentaje}%; background: ${porcentaje >= 70 ? '#27ae60' : porcentaje >= 40 ? '#f39c12' : '#e74c3c'}"></div></div>
                     </div>
@@ -907,7 +924,7 @@
                         <td>${reg.fechaDesde} al ${reg.fechaHasta}</td>
                         <td>${reg.actividades ? reg.actividades.length : 0}</td>
                         <td>${totalPart}</td>
-                        <td>$${totalOfrenda.toFixed(2)}</td>
+                        <td>Bs. ${totalOfrenda.toFixed(2)}</td>
                         <td><span class="badge ${metasCum === metasTot && metasTot > 0 ? 'badge-success' : metasCum > 0 ? 'badge-warning' : 'badge-danger'}">${metasCum}/${metasTot}</span></td>
                         <td class="acciones-cell">
                             <button class="btn btn-primary btn-small" onclick="verDetalle('${reg.id}')">Ver</button>
@@ -928,9 +945,9 @@
             const maxOfrenda = todasOfrendas.length > 0 ? Math.max(...todasOfrendas) : 0;
 
             const stats = [
-                { label: 'Total Recaudado', value: '$' + totalOfrendas.toFixed(2), icon: '💰', color: 'green' },
-                { label: 'Promedio por Actividad', value: '$' + promedioPorActividad.toFixed(2), icon: '📊', color: 'blue' },
-                { label: 'Mayor Ofrenda', value: '$' + maxOfrenda.toFixed(2), icon: '🏆', color: 'orange' }
+                { label: 'Total Recaudado', value: 'Bs. ' + totalOfrendas.toFixed(2), icon: '💰', color: 'green' },
+                { label: 'Promedio por Actividad', value: 'Bs. ' + promedioPorActividad.toFixed(2), icon: '📊', color: 'blue' },
+                { label: 'Mayor Ofrenda', value: 'Bs. ' + maxOfrenda.toFixed(2), icon: '🏆', color: 'orange' }
             ];
 
             document.getElementById('ofrendasStats').innerHTML = stats.map(stat => `
@@ -959,8 +976,8 @@
                     <td>${act.ministerio}</td>
                     <td>${act.actividad || '-'}</td>
                     <td>${act.participantes || 0}</td>
-                    <td>$${(act.ofrenda || 0).toFixed(2)}</td>
-                    <td>$${act.participantes > 0 ? ((act.ofrenda || 0) / act.participantes).toFixed(2) : '0.00'}</td>
+                    <td>Bs. ${(act.ofrenda || 0).toFixed(2)}</td>
+                    <td>Bs. ${act.participantes > 0 ? ((act.ofrenda || 0) / act.participantes).toFixed(2) : '0.00'}</td>
                 </tr>
             `).join('') || '<tr><td colspan="6" style="text-align: center;">No hay datos</td></tr>';
         }
@@ -1097,7 +1114,7 @@
                 const altura = (valor / max) * 200;
                 return `
                     <div class="bar-item">
-                        <div class="bar" style="height: ${altura}px;"><span class="bar-value">$${valor.toFixed(0)}</span></div>
+                        <div class="bar" style="height: ${altura}px;"><span class="bar-value">Bs. ${valor.toFixed(0)}</span></div>
                         <span class="bar-label">${nombresCortos[m]}</span>
                     </div>
                 `;
@@ -1133,7 +1150,7 @@
         }
 
         function verDetalle(id) {
-            const reg = datosGlobales.find(r => r.id == id);
+            const reg = datosGlobales.find(r => r.id === id.toString());
             if (!reg) return;
 
             const totalOfrenda = reg.actividades ? reg.actividades.reduce((s, a) => s + (a.ofrenda || 0), 0) : 0;
@@ -1150,7 +1167,7 @@
                 <h4 style="margin-bottom: 15px; color: #2c3e50;">Resumen</h4>
                 <div class="detail-grid" style="margin-bottom: 20px;">
                     <div class="detail-item" style="background: #e8f5e9;"><div class="detail-label">Total Participantes</div><div class="detail-value" style="color: #27ae60;">${totalPart}</div></div>
-                    <div class="detail-item" style="background: #fff3e0;"><div class="detail-label">Total Ofrendas</div><div class="detail-value" style="color: #f39c12;">$${totalOfrenda.toFixed(2)}</div></div>
+                    <div class="detail-item" style="background: #fff3e0;"><div class="detail-label">Total Ofrendas</div><div class="detail-value" style="color: #f39c12;">Bs. ${totalOfrenda.toFixed(2)}</div></div>
                     <div class="detail-item" style="background: #e3f2fd;"><div class="detail-label">Metas Cumplidas</div><div class="detail-value" style="color: #2196f3;">${metasCum} de ${reg.actividades ? reg.actividades.length : 0}</div></div>
                 </div>
                 <h4 style="margin-bottom: 15px; color: #2c3e50;">Actividades Detalladas</h4>
@@ -1164,7 +1181,7 @@
                                 <td>${a.meta || '-'}</td>
                                 <td>${a.participantes || 0}</td>
                                 <td>${a.ausentes || 0}</td>
-                                <td>$${(a.ofrenda || 0).toFixed(2)}</td>
+                                <td>Bs. ${(a.ofrenda || 0).toFixed(2)}</td>
                                 <td><span class="badge ${a.cumplida === 'SI' ? 'badge-success' : a.cumplida === 'NO' ? 'badge-danger' : 'badge-warning'}">${a.cumplida || 'N/A'}</span></td>
                             </tr>
                         `).join('') : '<tr><td colspan="7">Sin actividades</td></tr>'}
@@ -1288,7 +1305,7 @@
                 const stats = [
                     ['Total Registros', totalRegistros.toString()],
                     ['Total Actividades', totalActividades.toString()],
-                    ['Total Ofrendas', '$' + totalOfrendas.toFixed(2)],
+                    ['Total Ofrendas', 'Bs. ' + totalOfrendas.toFixed(2)],
                     ['Total Participantes', totalParticipantes.toString()]
                 ];
                 
@@ -1315,7 +1332,7 @@
                         `${reg.fechaDesde} al ${reg.fechaHasta}`,
                         (reg.actividades ? reg.actividades.length : 0).toString(),
                         totalPart.toString(),
-                        '$' + totalOfrenda.toFixed(2)
+                        'Bs. ' + totalOfrenda.toFixed(2)
                     ];
                 });
                 
@@ -1344,7 +1361,7 @@
                                     reg.ministerio.substring(0, 25),
                                     act.actividad || '-',
                                     (act.participantes || 0).toString(),
-                                    '$' + (act.ofrenda || 0).toFixed(2)
+                                    'Bs. ' + (act.ofrenda || 0).toFixed(2)
                                 ]);
                             }
                         });
@@ -1446,7 +1463,7 @@
                     s.registros.toString(),
                     s.actividades.toString(),
                     s.participantes.toString(),
-                    '$' + s.ofrendas.toFixed(2)
+                    'Bs. ' + s.ofrendas.toFixed(2)
                 ]);
                 
                 doc.autoTable({
