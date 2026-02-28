@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panel de Administración - Cristo es la Roca</title>
-    <!-- Librería para generar PDFs -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
     <style>
@@ -113,7 +112,6 @@
             display: none;
         }
 
-        /* MAIN APP */
         .app-container {
             display: none;
         }
@@ -605,8 +603,110 @@
             font-size: 1.1rem;
         }
 
-        .pdf-header {
+        /* ESTILOS PARA CAMBIO DE CONTRASEÑA */
+        .password-form {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .password-form .input-group {
+            margin-bottom: 25px;
+        }
+
+        .password-form input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 1rem;
+        }
+
+        .password-form input:focus {
+            outline: none;
+            border-color: #2a5298;
+        }
+
+        .password-requirements {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            font-size: 0.9rem;
+        }
+
+        .password-requirements h4 {
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+
+        .password-requirements ul {
+            margin-left: 20px;
+            color: #666;
+        }
+
+        .password-requirements li {
+            margin-bottom: 5px;
+        }
+
+        .password-requirements li.valid {
+            color: #27ae60;
+        }
+
+        .password-requirements li.valid::before {
+            content: "✓ ";
+            font-weight: bold;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
             display: none;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .user-list {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+
+        .user-list h4 {
+            margin-bottom: 15px;
+            color: #2c3e50;
+        }
+
+        .user-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: white;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 4px solid #2a5298;
+        }
+
+        .user-name {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .user-role {
+            font-size: 0.85rem;
+            color: #7f8c8d;
         }
 
         @media print {
@@ -652,11 +752,6 @@
             <div id="loginError" class="error-login">
                 ⚠️ Usuario o contraseña incorrectos
             </div>
-            
-            <div style="margin-top: 20px; font-size: 0.85rem; color: #999;">
-                <p>Usuario por defecto: <strong>admin</strong></p>
-                <p>Contraseña por defecto: <strong>cristo2024</strong></p>
-            </div>
         </div>
     </div>
 
@@ -680,6 +775,7 @@
                 <li><a href="#" onclick="showSection('ofrendas')">💰 Ofrendas y Finanzas</a></li>
                 <li><a href="#" onclick="showSection('asistencia')">👥 Asistencia</a></li>
                 <li><a href="#" onclick="showSection('metas')">🎯 Cumplimiento de Metas</a></li>
+                <li><a href="#" onclick="showSection('configuracion')">⚙️ Configuración</a></li>
                 <li><a href="#" onclick="exportarDatos()">📥 Exportar a Excel</a></li>
                 <li><a href="#" onclick="limpiarTodo()" style="color: #ff6b6b;">🗑️ Limpiar Todo</a></li>
             </ul>
@@ -812,6 +908,70 @@
                     <div id="metasDetalle"></div>
                 </div>
             </div>
+
+            <!-- SECCIÓN CONFIGURACIÓN (CAMBIO DE CONTRASEÑA) -->
+            <div id="configuracion" class="section">
+                <div class="top-bar">
+                    <h2>⚙️ Configuración del Sistema</h2>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">👥 Usuarios del Sistema</h3>
+                    </div>
+                    <div class="user-list" id="userList">
+                        <!-- Lista de usuarios generada dinámicamente -->
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">🔐 Cambiar Contraseña</h3>
+                    </div>
+                    
+                    <div id="alertMessage" class="alert"></div>
+
+                    <form class="password-form" id="passwordForm" onsubmit="return false;">
+                        <div class="input-group">
+                            <label for="currentPassword">Contraseña Actual</label>
+                            <input type="password" id="currentPassword" placeholder="Ingrese su contraseña actual" required>
+                        </div>
+
+                        <div class="input-group">
+                            <label for="newPassword">Nueva Contraseña</label>
+                            <input type="password" id="newPassword" placeholder="Ingrese nueva contraseña" required oninput="validarRequisitos()">
+                        </div>
+
+                        <div class="password-requirements">
+                            <h4>Requisitos de la contraseña:</h4>
+                            <ul id="requirementsList">
+                                <li id="req-length">Mínimo 6 caracteres</li>
+                                <li id="req-number">Al menos un número</li>
+                                <li id="req-upper">Al menos una mayúscula</li>
+                                <li id="req-lower">Al menos una minúscula</li>
+                            </ul>
+                        </div>
+
+                        <div class="input-group">
+                            <label for="confirmPassword">Confirmar Nueva Contraseña</label>
+                            <input type="password" id="confirmPassword" placeholder="Repita la nueva contraseña" required>
+                        </div>
+
+                        <button type="button" class="btn btn-primary" onclick="cambiarPassword()" style="width: 100%; padding: 15px;">
+                            💾 Guardar Nueva Contraseña
+                        </button>
+                    </form>
+                </div>
+
+                <div class="card" style="background: #fff3cd; border-left: 5px solid #f39c12;">
+                    <h4 style="color: #856404; margin-bottom: 10px;">⚠️ Nota de Seguridad</h4>
+                    <p style="color: #856404; font-size: 0.95rem;">
+                        Por seguridad, se recomienda cambiar las contraseñas periódicamente. 
+                        Las contraseñas se almacenan de forma segura en el navegador de este dispositivo.
+                        Si olvida su contraseña, contacte al administrador del sistema.
+                    </p>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -828,13 +988,17 @@
 
     <script>
         // CONFIGURACIÓN DE SEGURIDAD
-        const USUARIOS = {
-            'admin': 'cristo2024',
-            'pastor': 'rocafirme2024',
-            'tesorero': 'ofrendas2024'
+        const USERS_KEY = 'cristo_roca_users';
+        
+        // Usuarios por defecto (se guardarán en localStorage)
+        const DEFAULT_USERS = {
+            'admin': { password: 'cristo2024', role: 'Administrador', name: 'Administrador' },
+            'pastor': { password: 'rocafirme2024', role: 'Pastor', name: 'Pastor' },
+            'tesorero': { password: 'ofrendas2024', role: 'Tesorero', name: 'Tesorero' }
         };
 
         let currentUser = null;
+        let users = {};
         const DB_KEY = 'cristo_es_la_roca_db';
         const MINISTERIOS = [
             "Ministerio de Evangelismo y Crecimiento",
@@ -847,8 +1011,25 @@
 
         let datosGlobales = [];
 
+        // INICIALIZAR SISTEMA
+        function initSystem() {
+            // Cargar usuarios de localStorage o usar defaults
+            const savedUsers = localStorage.getItem(USERS_KEY);
+            if (savedUsers) {
+                users = JSON.parse(savedUsers);
+            } else {
+                users = JSON.parse(JSON.stringify(DEFAULT_USERS));
+                saveUsers();
+            }
+        }
+
+        function saveUsers() {
+            localStorage.setItem(USERS_KEY, JSON.stringify(users));
+        }
+
         // VERIFICAR SESIÓN AL CARGAR
         window.onload = function() {
+            initSystem();
             const sesion = sessionStorage.getItem('cristoRocaSession');
             if (sesion) {
                 const datos = JSON.parse(sesion);
@@ -865,9 +1046,8 @@
             const username = document.getElementById('username').value.trim().toLowerCase();
             const password = document.getElementById('password').value;
             
-            if (USUARIOS[username] && USUARIOS[username] === password) {
+            if (users[username] && users[username].password === password) {
                 currentUser = username;
-                // Guardar sesión por 8 horas
                 const sesion = {
                     usuario: username,
                     expiracion: Date.now() + (8 * 60 * 60 * 1000)
@@ -885,8 +1065,9 @@
         function mostrarApp() {
             document.getElementById('loginScreen').style.display = 'none';
             document.getElementById('appContainer').style.display = 'block';
-            document.getElementById('currentUser').textContent = currentUser;
+            document.getElementById('currentUser').textContent = users[currentUser].name;
             cargarDatos();
+            actualizarListaUsuarios();
         }
 
         function logout() {
@@ -894,6 +1075,87 @@
             location.reload();
         }
 
+        // CAMBIO DE CONTRASEÑA
+        function validarRequisitos() {
+            const password = document.getElementById('newPassword').value;
+            
+            const hasLength = password.length >= 6;
+            const hasNumber = /\d/.test(password);
+            const hasUpper = /[A-Z]/.test(password);
+            const hasLower = /[a-z]/.test(password);
+            
+            document.getElementById('req-length').className = hasLength ? 'valid' : '';
+            document.getElementById('req-number').className = hasNumber ? 'valid' : '';
+            document.getElementById('req-upper').className = hasUpper ? 'valid' : '';
+            document.getElementById('req-lower').className = hasLower ? 'valid' : '';
+            
+            return hasLength && hasNumber && hasUpper && hasLower;
+        }
+
+        function cambiarPassword() {
+            const currentPass = document.getElementById('currentPassword').value;
+            const newPass = document.getElementById('newPassword').value;
+            const confirmPass = document.getElementById('confirmPassword').value;
+            
+            // Validar contraseña actual
+            if (currentPass !== users[currentUser].password) {
+                showAlert('❌ La contraseña actual es incorrecta', 'error');
+                return;
+            }
+            
+            // Validar requisitos
+            if (!validarRequisitos()) {
+                showAlert('❌ La nueva contraseña no cumple con todos los requisitos', 'error');
+                return;
+            }
+            
+            // Validar coincidencia
+            if (newPass !== confirmPass) {
+                showAlert('❌ Las contraseñas nuevas no coinciden', 'error');
+                return;
+            }
+            
+            // Cambiar contraseña
+            users[currentUser].password = newPass;
+            saveUsers();
+            
+            // Limpiar formulario
+            document.getElementById('passwordForm').reset();
+            document.querySelectorAll('.password-requirements li').forEach(li => li.className = '');
+            
+            showAlert('✅ Contraseña cambiada exitosamente', 'success');
+        }
+
+        function showAlert(message, type) {
+            const alertDiv = document.getElementById('alertMessage');
+            alertDiv.textContent = message;
+            alertDiv.className = 'alert alert-' + type;
+            alertDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                alertDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        function actualizarListaUsuarios() {
+            const container = document.getElementById('userList');
+            container.innerHTML = '<h4>Usuarios Registrados</h4>';
+            
+            Object.entries(users).forEach(([username, data]) => {
+                const isCurrent = username === currentUser;
+                container.innerHTML += `
+                    <div class="user-item" style="${isCurrent ? 'border-left-color: #27ae60; background: #f0fff4;' : ''}">
+                        <div>
+                            <div class="user-name">${data.name} ${isCurrent ? '(Tú)' : ''}</div>
+                            <div class="user-role">${data.role} | Usuario: ${username}</div>
+                        </div>
+                        ${isCurrent ? '<span style="color: #27ae60; font-size: 0.85rem;">✓ Sesión activa</span>' : ''}
+                    </div>
+                `;
+            });
+        }
+
+        // RESTO DE FUNCIONES (cargarDatos, actualizarStats, etc.)
         function cargarDatos() {
             datosGlobales = JSON.parse(localStorage.getItem(DB_KEY)) || [];
             actualizarTodo();
@@ -1360,12 +1622,10 @@
             }
         }
 
-        // GENERAR PDF
         function generarPDF(tipo) {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
             
-            // Encabezado
             doc.setFillColor(30, 60, 114);
             doc.rect(0, 0, 210, 40, 'F');
             
@@ -1574,7 +1834,6 @@
                 });
             }
             
-            // Pie de página
             const pageCount = doc.internal.getNumberOfPages();
             for (let i = 1; i <= pageCount; i++) {
                 doc.setPage(i);
@@ -1618,6 +1877,11 @@
             
             document.querySelectorAll('.nav-menu a').forEach(a => a.classList.remove('active'));
             event.target.classList.add('active');
+            
+            // Si es la sección de configuración, actualizar lista de usuarios
+            if (sectionId === 'configuracion') {
+                actualizarListaUsuarios();
+            }
         }
     </script>
 </body>
