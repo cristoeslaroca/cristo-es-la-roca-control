@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panel de Administración - Cristo es la Roca</title>
+    <!-- Librería para generar PDFs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -15,6 +18,104 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: #f5f7fa;
             min-height: 100vh;
+        }
+
+        /* LOGIN SCREEN */
+        .login-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+
+        .login-box {
+            background: white;
+            padding: 50px;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+            animation: fadeInUp 0.5s ease;
+        }
+
+        .login-box h1 {
+            color: #1e3c72;
+            margin-bottom: 10px;
+            font-size: 1.8rem;
+        }
+
+        .login-box h2 {
+            color: #666;
+            font-weight: 300;
+            margin-bottom: 30px;
+            font-size: 1.1rem;
+        }
+
+        .login-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #2a5298;
+        }
+
+        .btn-login {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+
+        .error-login {
+            color: #e74c3c;
+            margin-top: 15px;
+            display: none;
+        }
+
+        /* MAIN APP */
+        .app-container {
+            display: none;
         }
 
         .sidebar {
@@ -45,6 +146,30 @@
         .sidebar-header p {
             font-size: 0.9rem;
             opacity: 0.8;
+        }
+
+        .user-info {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+        }
+
+        .logout-btn {
+            width: 100%;
+            padding: 10px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: all 0.3s;
+        }
+
+        .logout-btn:hover {
+            background: rgba(255,255,255,0.3);
         }
 
         .nav-menu {
@@ -190,10 +315,18 @@
             font-size: 0.9rem;
             font-weight: 600;
             transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .btn-primary {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-success {
+            background: #27ae60;
             color: white;
         }
 
@@ -202,8 +335,8 @@
             color: white;
         }
 
-        .btn-success {
-            background: #27ae60;
+        .btn-warning {
+            background: #f39c12;
             color: white;
         }
 
@@ -329,6 +462,11 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
         .empty-state {
             text-align: center;
             padding: 60px 20px;
@@ -391,19 +529,6 @@
             text-align: center;
             transform: rotate(-45deg);
             white-space: nowrap;
-        }
-
-        @media (max-width: 1024px) {
-            .sidebar {
-                transform: translateX(-100%);
-                transition: transform 0.3s;
-            }
-            .sidebar.open {
-                transform: translateX(0);
-            }
-            .main-content {
-                margin-left: 0;
-            }
         }
 
         .modal {
@@ -479,161 +604,212 @@
             color: #2c3e50;
             font-size: 1.1rem;
         }
+
+        .pdf-header {
+            display: none;
+        }
+
+        @media print {
+            .sidebar, .top-bar, .btn, .modal { display: none !important; }
+            .main-content { margin-left: 0; }
+            .card { box-shadow: none; border: 1px solid #ddd; page-break-inside: avoid; }
+        }
+
+        @media (max-width: 1024px) {
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s;
+            }
+            .sidebar.open {
+                transform: translateX(0);
+            }
+            .main-content {
+                margin-left: 0;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="sidebar">
-        <div class="sidebar-header">
-            <h1>⛪ Cristo es la Roca</h1>
-            <p>Panel de Administración</p>
+    <!-- LOGIN SCREEN -->
+    <div id="loginScreen" class="login-screen">
+        <div class="login-box">
+            <div class="login-icon">🔐</div>
+            <h1>Panel de Administración</h1>
+            <h2>Templo Evangélico Pentecostés<br>"Cristo es la Roca"</h2>
+            
+            <div class="input-group">
+                <label for="username">Usuario</label>
+                <input type="text" id="username" placeholder="Ingrese su usuario">
+            </div>
+            
+            <div class="input-group">
+                <label for="password">Contraseña</label>
+                <input type="password" id="password" placeholder="Ingrese su contraseña" onkeypress="if(event.key==='Enter')login()">
+            </div>
+            
+            <button class="btn-login" onclick="login()">Ingresar al Sistema</button>
+            
+            <div id="loginError" class="error-login">
+                ⚠️ Usuario o contraseña incorrectos
+            </div>
+            
+            <div style="margin-top: 20px; font-size: 0.85rem; color: #999;">
+                <p>Usuario por defecto: <strong>admin</strong></p>
+                <p>Contraseña por defecto: <strong>cristo2024</strong></p>
+            </div>
         </div>
-        <ul class="nav-menu">
-            <li><a href="#" class="active" onclick="showSection('dashboard')">📊 Dashboard General</a></li>
-            <li><a href="#" onclick="showSection('ministerios')">🏛️ Por Ministerios</a></li>
-            <li><a href="#" onclick="showSection('registros')">📋 Todos los Registros</a></li>
-            <li><a href="#" onclick="showSection('ofrendas')">💰 Ofrendas y Finanzas</a></li>
-            <li><a href="#" onclick="showSection('asistencia')">👥 Asistencia</a></li>
-            <li><a href="#" onclick="showSection('metas')">🎯 Cumplimiento de Metas</a></li>
-            <li><a href="#" onclick="exportarDatos()">📥 Exportar Datos</a></li>
-            <li><a href="#" onclick="limpiarTodo()" style="color: #ff6b6b;">🗑️ Limpiar Todo</a></li>
-        </ul>
     </div>
 
-    <div class="main-content">
-        <!-- SECCIÓN DASHBOARD -->
-        <div id="dashboard" class="section active">
-            <div class="top-bar">
-                <h2>Dashboard General</h2>
-                <div class="filters">
-                    <select id="filterMinisterio" onchange="filtrarDatos()">
-                        <option value="">Todos los Ministerios</option>
-                    </select>
-                    <input type="month" id="filterMes" onchange="filtrarDatos()">
-                </div>
+    <!-- MAIN APP -->
+    <div id="appContainer" class="app-container">
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h1>⛪ Cristo es la Roca</h1>
+                <p>Panel de Administración</p>
             </div>
-
-            <div class="stats-grid" id="statsContainer">
-                <!-- Estadísticas generadas dinámicamente -->
+            
+            <div class="user-info">
+                👤 <span id="currentUser">Administrador</span>
+                <button class="logout-btn" onclick="logout()">Cerrar Sesión</button>
             </div>
+            
+            <ul class="nav-menu">
+                <li><a href="#" class="active" onclick="showSection('dashboard')">📊 Dashboard General</a></li>
+                <li><a href="#" onclick="showSection('ministerios')">🏛️ Por Ministerios</a></li>
+                <li><a href="#" onclick="showSection('registros')">📋 Todos los Registros</a></li>
+                <li><a href="#" onclick="showSection('ofrendas')">💰 Ofrendas y Finanzas</a></li>
+                <li><a href="#" onclick="showSection('asistencia')">👥 Asistencia</a></li>
+                <li><a href="#" onclick="showSection('metas')">🎯 Cumplimiento de Metas</a></li>
+                <li><a href="#" onclick="exportarDatos()">📥 Exportar a Excel</a></li>
+                <li><a href="#" onclick="limpiarTodo()" style="color: #ff6b6b;">🗑️ Limpiar Todo</a></li>
+            </ul>
+        </div>
 
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">📈 Ofrendas por Ministerio</h3>
+        <div class="main-content">
+            <!-- SECCIÓN DASHBOARD -->
+            <div id="dashboard" class="section active">
+                <div class="top-bar">
+                    <h2>Dashboard General</h2>
+                    <div class="filters">
+                        <select id="filterMinisterio" onchange="filtrarDatos()">
+                            <option value="">Todos los Ministerios</option>
+                        </select>
+                        <input type="month" id="filterMes" onchange="filtrarDatos()">
+                        <button class="btn btn-success" onclick="generarPDF('dashboard')">📄 PDF</button>
+                    </div>
                 </div>
-                <div class="chart-container">
-                    <div class="bar-chart" id="ofrendasChart">
-                        <!-- Gráfico generado dinámicamente -->
+
+                <div class="stats-grid" id="statsContainer"></div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">📈 Ofrendas por Ministerio</h3>
+                        <button class="btn btn-success" onclick="generarPDF('grafico')">📄 PDF</button>
+                    </div>
+                    <div class="chart-container">
+                        <div class="bar-chart" id="ofrendasChart"></div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- SECCIÓN MINISTERIOS -->
-        <div id="ministerios" class="section">
-            <div class="top-bar">
-                <h2>Estadísticas por Ministerio</h2>
+            <!-- SECCIÓN MINISTERIOS -->
+            <div id="ministerios" class="section">
+                <div class="top-bar">
+                    <h2>Estadísticas por Ministerio</h2>
+                    <button class="btn btn-success" onclick="generarPDF('ministerios')">📄 PDF</button>
+                </div>
+                <div class="ministerios-grid" id="ministeriosGrid"></div>
             </div>
-            <div class="ministerios-grid" id="ministeriosGrid">
-                <!-- Tarjetas de ministerios generadas dinámicamente -->
-            </div>
-        </div>
 
-        <!-- SECCIÓN REGISTROS -->
-        <div id="registros" class="section">
-            <div class="top-bar">
-                <h2>Todos los Registros</h2>
-                <button class="btn btn-primary" onclick="exportarDatos()">📥 Exportar a Excel</button>
+            <!-- SECCIÓN REGISTROS -->
+            <div id="registros" class="section">
+                <div class="top-bar">
+                    <h2>Todos los Registros</h2>
+                    <div>
+                        <button class="btn btn-primary" onclick="exportarDatos()">📥 Excel</button>
+                        <button class="btn btn-success" onclick="generarPDF('registros')">📄 PDF</button>
+                    </div>
+                </div>
+                <div class="card">
+                    <table class="data-table" id="registrosTable">
+                        <thead>
+                            <tr>
+                                <th>Fecha Registro</th>
+                                <th>Ministerio</th>
+                                <th>Líder</th>
+                                <th>Período</th>
+                                <th>Actividades</th>
+                                <th>Participantes</th>
+                                <th>Ofrenda Total</th>
+                                <th>Metas Cumplidas</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="registrosBody"></tbody>
+                    </table>
+                </div>
             </div>
-            <div class="card">
-                <table class="data-table" id="registrosTable">
-                    <thead>
-                        <tr>
-                            <th>Fecha Registro</th>
-                            <th>Ministerio</th>
-                            <th>Líder</th>
-                            <th>Período</th>
-                            <th>Actividades</th>
-                            <th>Participantes</th>
-                            <th>Ofrenda Total</th>
-                            <th>Metas Cumplidas</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody id="registrosBody">
-                        <!-- Registros generados dinámicamente -->
-                    </tbody>
-                </table>
-            </div>
-        </div>
 
-        <!-- SECCIÓN OFRENDAS -->
-        <div id="ofrendas" class="section">
-            <div class="top-bar">
-                <h2>💰 Control de Ofrendas</h2>
+            <!-- SECCIÓN OFRENDAS -->
+            <div id="ofrendas" class="section">
+                <div class="top-bar">
+                    <h2>💰 Control de Ofrendas</h2>
+                    <button class="btn btn-success" onclick="generarPDF('ofrendas')">📄 PDF</button>
+                </div>
+                <div class="stats-grid" id="ofrendasStats"></div>
+                <div class="card">
+                    <h3 class="card-title" style="margin-bottom: 20px;">Detalle por Actividad</h3>
+                    <table class="data-table" id="ofrendasTable">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Ministerio</th>
+                                <th>Actividad</th>
+                                <th>Participantes</th>
+                                <th>Ofrenda</th>
+                                <th>Ofrenda per cápita</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ofrendasBody"></tbody>
+                    </table>
+                </div>
             </div>
-            <div class="stats-grid" id="ofrendasStats">
-                <!-- Estadísticas de ofrendas -->
-            </div>
-            <div class="card">
-                <h3 class="card-title" style="margin-bottom: 20px;">Detalle por Actividad</h3>
-                <table class="data-table" id="ofrendasTable">
-                    <thead>
-                        <tr>
-                            <th>Fecha</th>
-                            <th>Ministerio</th>
-                            <th>Actividad</th>
-                            <th>Participantes</th>
-                            <th>Ofrenda</th>
-                            <th>Ofrenda per cápita</th>
-                        </tr>
-                    </thead>
-                    <tbody id="ofrendasBody">
-                        <!-- Datos generados dinámicamente -->
-                    </tbody>
-                </table>
-            </div>
-        </div>
 
-        <!-- SECCIÓN ASISTENCIA -->
-        <div id="asistencia" class="section">
-            <div class="top-bar">
-                <h2>👥 Control de Asistencia</h2>
+            <!-- SECCIÓN ASISTENCIA -->
+            <div id="asistencia" class="section">
+                <div class="top-bar">
+                    <h2>👥 Control de Asistencia</h2>
+                    <button class="btn btn-success" onclick="generarPDF('asistencia')">📄 PDF</button>
+                </div>
+                <div class="stats-grid" id="asistenciaStats"></div>
+                <div class="card">
+                    <h3 class="card-title" style="margin-bottom: 20px;">Detalle de Participación</h3>
+                    <table class="data-table" id="asistenciaTable">
+                        <thead>
+                            <tr>
+                                <th>Ministerio</th>
+                                <th>Total Actividades</th>
+                                <th>Total Participantes</th>
+                                <th>Total Ausentes</th>
+                                <th>% Asistencia</th>
+                                <th>Promedio por Actividad</th>
+                            </tr>
+                        </thead>
+                        <tbody id="asistenciaBody"></tbody>
+                    </table>
+                </div>
             </div>
-            <div class="stats-grid" id="asistenciaStats">
-                <!-- Estadísticas de asistencia -->
-            </div>
-            <div class="card">
-                <h3 class="card-title" style="margin-bottom: 20px;">Detalle de Participación</h3>
-                <table class="data-table" id="asistenciaTable">
-                    <thead>
-                        <tr>
-                            <th>Ministerio</th>
-                            <th>Total Actividades</th>
-                            <th>Total Participantes</th>
-                            <th>Total Ausentes</th>
-                            <th>% Asistencia</th>
-                            <th>Promedio por Actividad</th>
-                        </tr>
-                    </thead>
-                    <tbody id="asistenciaBody">
-                        <!-- Datos generados dinámicamente -->
-                    </tbody>
-                </table>
-            </div>
-        </div>
 
-        <!-- SECCIÓN METAS -->
-        <div id="metas" class="section">
-            <div class="top-bar">
-                <h2>🎯 Cumplimiento de Metas</h2>
-            </div>
-            <div class="stats-grid" id="metasStats">
-                <!-- Estadísticas de metas -->
-            </div>
-            <div class="card">
-                <h3 class="card-title" style="margin-bottom: 20px;">Progreso por Ministerio</h3>
-                <div id="metasDetalle">
-                    <!-- Barras de progreso generadas dinámicamente -->
+            <!-- SECCIÓN METAS -->
+            <div id="metas" class="section">
+                <div class="top-bar">
+                    <h2>🎯 Cumplimiento de Metas</h2>
+                    <button class="btn btn-success" onclick="generarPDF('metas')">📄 PDF</button>
+                </div>
+                <div class="stats-grid" id="metasStats"></div>
+                <div class="card">
+                    <h3 class="card-title" style="margin-bottom: 20px;">Progreso por Ministerio</h3>
+                    <div id="metasDetalle"></div>
                 </div>
             </div>
         </div>
@@ -646,13 +822,19 @@
                 <h3>Detalle del Registro</h3>
                 <span class="close-modal" onclick="closeModal()">&times;</span>
             </div>
-            <div id="modalBody">
-                <!-- Contenido generado dinámicamente -->
-            </div>
+            <div id="modalBody"></div>
         </div>
     </div>
 
     <script>
+        // CONFIGURACIÓN DE SEGURIDAD
+        const USUARIOS = {
+            'admin': 'cristo2024',
+            'pastor': 'rocafirme2024',
+            'tesorero': 'ofrendas2024'
+        };
+
+        let currentUser = null;
         const DB_KEY = 'cristo_es_la_roca_db';
         const MINISTERIOS = [
             "Ministerio de Evangelismo y Crecimiento",
@@ -664,6 +846,53 @@
         ];
 
         let datosGlobales = [];
+
+        // VERIFICAR SESIÓN AL CARGAR
+        window.onload = function() {
+            const sesion = sessionStorage.getItem('cristoRocaSession');
+            if (sesion) {
+                const datos = JSON.parse(sesion);
+                if (datos.expiracion > Date.now()) {
+                    currentUser = datos.usuario;
+                    mostrarApp();
+                } else {
+                    sessionStorage.removeItem('cristoRocaSession');
+                }
+            }
+        };
+
+        function login() {
+            const username = document.getElementById('username').value.trim().toLowerCase();
+            const password = document.getElementById('password').value;
+            
+            if (USUARIOS[username] && USUARIOS[username] === password) {
+                currentUser = username;
+                // Guardar sesión por 8 horas
+                const sesion = {
+                    usuario: username,
+                    expiracion: Date.now() + (8 * 60 * 60 * 1000)
+                };
+                sessionStorage.setItem('cristoRocaSession', JSON.stringify(sesion));
+                mostrarApp();
+            } else {
+                document.getElementById('loginError').style.display = 'block';
+                setTimeout(() => {
+                    document.getElementById('loginError').style.display = 'none';
+                }, 3000);
+            }
+        }
+
+        function mostrarApp() {
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('appContainer').style.display = 'block';
+            document.getElementById('currentUser').textContent = currentUser;
+            cargarDatos();
+        }
+
+        function logout() {
+            sessionStorage.removeItem('cristoRocaSession');
+            location.reload();
+        }
 
         function cargarDatos() {
             datosGlobales = JSON.parse(localStorage.getItem(DB_KEY)) || [];
@@ -842,7 +1071,6 @@
                 </div>
             `).join('');
 
-            // Tabla detalle
             const tbody = document.getElementById('ofrendasBody');
             const todasActividades = [];
             datosGlobales.forEach(reg => {
@@ -893,7 +1121,6 @@
                 </div>
             `).join('');
 
-            // Tabla por ministerio
             const tbody = document.getElementById('asistenciaBody');
             const statsMin = {};
             
@@ -949,7 +1176,6 @@
                 </div>
             `).join('');
 
-            // Detalle por ministerio
             const container = document.getElementById('metasDetalle');
             const statsMin = {};
             
@@ -1134,6 +1360,232 @@
             }
         }
 
+        // GENERAR PDF
+        function generarPDF(tipo) {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            // Encabezado
+            doc.setFillColor(30, 60, 114);
+            doc.rect(0, 0, 210, 40, 'F');
+            
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(20);
+            doc.text('Templo Evangélico Pentecostés', 105, 20, { align: 'center' });
+            doc.setFontSize(16);
+            doc.text('"Cristo es la Roca"', 105, 30, { align: 'center' });
+            
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(12);
+            doc.text(`Reporte generado: ${new Date().toLocaleString('es-ES')}`, 14, 50);
+            doc.text(`Usuario: ${currentUser}`, 14, 58);
+            
+            let startY = 70;
+            
+            if (tipo === 'dashboard' || tipo === 'stats') {
+                doc.setFontSize(16);
+                doc.text('Resumen General', 14, startY);
+                
+                const totalRegistros = datosGlobales.length;
+                const totalActividades = datosGlobales.reduce((sum, r) => sum + r.actividades.length, 0);
+                const totalOfrendas = datosGlobales.reduce((sum, r) => 
+                    sum + r.actividades.reduce((s, a) => s + (a.ofrenda || 0), 0), 0);
+                const totalParticipantes = datosGlobales.reduce((sum, r) => 
+                    sum + r.actividades.reduce((s, a) => s + (a.participantes || 0), 0), 0);
+                
+                const stats = [
+                    ['Total Registros', totalRegistros.toString()],
+                    ['Total Actividades', totalActividades.toString()],
+                    ['Total Ofrendas', '$' + totalOfrendas.toFixed(2)],
+                    ['Total Participantes', totalParticipantes.toString()]
+                ];
+                
+                doc.autoTable({
+                    startY: startY + 10,
+                    head: [['Indicador', 'Valor']],
+                    body: stats,
+                    theme: 'grid',
+                    headStyles: { fillColor: [30, 60, 114], textColor: 255 }
+                });
+            }
+            
+            if (tipo === 'registros') {
+                doc.setFontSize(16);
+                doc.text('Listado Completo de Registros', 14, startY);
+                
+                const data = datosGlobales.map(reg => {
+                    const totalOfrenda = reg.actividades.reduce((s, a) => s + (a.ofrenda || 0), 0);
+                    const totalPart = reg.actividades.reduce((s, a) => s + (a.participantes || 0), 0);
+                    return [
+                        new Date(reg.fechaRegistro).toLocaleDateString('es-ES'),
+                        reg.ministerio.substring(0, 30),
+                        reg.lider,
+                        `${reg.fechaDesde} al ${reg.fechaHasta}`,
+                        reg.actividades.length.toString(),
+                        totalPart.toString(),
+                        '$' + totalOfrenda.toFixed(2)
+                    ];
+                });
+                
+                doc.autoTable({
+                    startY: startY + 10,
+                    head: [['Fecha', 'Ministerio', 'Líder', 'Período', 'Acts.', 'Part.', 'Ofrenda']],
+                    body: data,
+                    theme: 'grid',
+                    headStyles: { fillColor: [30, 60, 114], textColor: 255 },
+                    styles: { fontSize: 9 },
+                    columnStyles: {
+                        0: { cellWidth: 25 },
+                        1: { cellWidth: 40 },
+                        2: { cellWidth: 30 },
+                        3: { cellWidth: 35 },
+                        4: { cellWidth: 15 },
+                        5: { cellWidth: 20 },
+                        6: { cellWidth: 25 }
+                    }
+                });
+            }
+            
+            if (tipo === 'ofrendas') {
+                doc.setFontSize(16);
+                doc.text('Reporte de Ofrendas', 14, startY);
+                
+                const todasActividades = [];
+                datosGlobales.forEach(reg => {
+                    reg.actividades.forEach(act => {
+                        if (act.ofrenda > 0) {
+                            todasActividades.push([
+                                act.fecha || '-',
+                                reg.ministerio.substring(0, 25),
+                                act.actividad || '-',
+                                (act.participantes || 0).toString(),
+                                '$' + (act.ofrenda || 0).toFixed(2)
+                            ]);
+                        }
+                    });
+                });
+                
+                doc.autoTable({
+                    startY: startY + 10,
+                    head: [['Fecha', 'Ministerio', 'Actividad', 'Participantes', 'Ofrenda']],
+                    body: todasActividades,
+                    theme: 'grid',
+                    headStyles: { fillColor: [30, 60, 114], textColor: 255 }
+                });
+            }
+            
+            if (tipo === 'asistencia') {
+                doc.setFontSize(16);
+                doc.text('Reporte de Asistencia', 14, startY);
+                
+                const statsMin = {};
+                datosGlobales.forEach(reg => {
+                    if (!statsMin[reg.ministerio]) {
+                        statsMin[reg.ministerio] = { act: 0, part: 0, aus: 0 };
+                    }
+                    statsMin[reg.ministerio].act += reg.actividades.length;
+                    reg.actividades.forEach(a => {
+                        statsMin[reg.ministerio].part += a.participantes || 0;
+                        statsMin[reg.ministerio].aus += a.ausentes || 0;
+                    });
+                });
+                
+                const data = Object.entries(statsMin).map(([min, s]) => {
+                    const total = s.part + s.aus;
+                    const pct = total > 0 ? Math.round((s.part / total) * 100) : 0;
+                    return [min.substring(0, 35), s.act.toString(), s.part.toString(), s.aus.toString(), pct + '%'];
+                });
+                
+                doc.autoTable({
+                    startY: startY + 10,
+                    head: [['Ministerio', 'Actividades', 'Participantes', 'Ausentes', '% Asistencia']],
+                    body: data,
+                    theme: 'grid',
+                    headStyles: { fillColor: [30, 60, 114], textColor: 255 }
+                });
+            }
+            
+            if (tipo === 'metas') {
+                doc.setFontSize(16);
+                doc.text('Cumplimiento de Metas', 14, startY);
+                
+                const statsMin = {};
+                datosGlobales.forEach(reg => {
+                    if (!statsMin[reg.ministerio]) {
+                        statsMin[reg.ministerio] = { total: 0, cumplidas: 0 };
+                    }
+                    reg.actividades.forEach(a => {
+                        if (a.cumplida) {
+                            statsMin[reg.ministerio].total++;
+                            if (a.cumplida === 'SI') statsMin[reg.ministerio].cumplidas++;
+                        }
+                    });
+                });
+                
+                const data = Object.entries(statsMin).map(([min, s]) => {
+                    const pct = s.total > 0 ? Math.round((s.cumplidas / s.total) * 100) : 0;
+                    return [min.substring(0, 40), s.cumplidas.toString(), s.total.toString(), pct + '%'];
+                });
+                
+                doc.autoTable({
+                    startY: startY + 10,
+                    head: [['Ministerio', 'Metas Cumplidas', 'Total Metas', '% Cumplimiento']],
+                    body: data,
+                    theme: 'grid',
+                    headStyles: { fillColor: [30, 60, 114], textColor: 255 }
+                });
+            }
+            
+            if (tipo === 'ministerios') {
+                doc.setFontSize(16);
+                doc.text('Estadísticas por Ministerio', 14, startY);
+                
+                const statsPorMinisterio = {};
+                MINISTERIOS.forEach(m => {
+                    statsPorMinisterio[m] = { actividades: 0, participantes: 0, ofrendas: 0, registros: 0 };
+                });
+
+                datosGlobales.forEach(reg => {
+                    const m = reg.ministerio;
+                    if (statsPorMinisterio[m]) {
+                        statsPorMinisterio[m].registros++;
+                        statsPorMinisterio[m].actividades += reg.actividades.length;
+                        reg.actividades.forEach(act => {
+                            statsPorMinisterio[m].participantes += act.participantes || 0;
+                            statsPorMinisterio[m].ofrendas += act.ofrenda || 0;
+                        });
+                    }
+                });
+                
+                const data = Object.entries(statsPorMinisterio).map(([min, s]) => [
+                    min.substring(0, 35),
+                    s.registros.toString(),
+                    s.actividades.toString(),
+                    s.participantes.toString(),
+                    '$' + s.ofrendas.toFixed(2)
+                ]);
+                
+                doc.autoTable({
+                    startY: startY + 10,
+                    head: [['Ministerio', 'Registros', 'Actividades', 'Participantes', 'Ofrendas']],
+                    body: data,
+                    theme: 'grid',
+                    headStyles: { fillColor: [30, 60, 114], textColor: 255 }
+                });
+            }
+            
+            // Pie de página
+            const pageCount = doc.internal.getNumberOfPages();
+            for (let i = 1; i <= pageCount; i++) {
+                doc.setPage(i);
+                doc.setFontSize(10);
+                doc.setTextColor(128, 128, 128);
+                doc.text(`Página ${i} de ${pageCount} - Sistema Cristo es la Roca`, 105, 290, { align: 'center' });
+            }
+            
+            doc.save(`reporte_${tipo}_${new Date().toISOString().split('T')[0]}.pdf`);
+        }
+
         function exportarDatos() {
             let csv = 'ID,Fecha Registro,Ministerio,Lider,Fecha Desde,Fecha Hasta,Actividad,Fecha Actividad,Meta,Participantes,Ausentes,Ofrenda,Meta Cumplida,Resultados,Observaciones\n';
             
@@ -1167,9 +1619,6 @@
             document.querySelectorAll('.nav-menu a').forEach(a => a.classList.remove('active'));
             event.target.classList.add('active');
         }
-
-        // Inicializar
-        cargarDatos();
     </script>
 </body>
 </html>

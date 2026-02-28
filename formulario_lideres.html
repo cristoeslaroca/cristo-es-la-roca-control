@@ -139,7 +139,6 @@
             text-align: center;
         }
 
-        /* Tabla de Actividades */
         .activities-table-container {
             overflow-x: auto;
             margin-top: 20px;
@@ -271,6 +270,23 @@
             color: #0d47a1;
         }
 
+        .admin-link {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+        }
+
+        .admin-link:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
         @keyframes fadeInUp {
             from { opacity: 0; transform: translateY(30px); }
             to { opacity: 1; transform: translateY(0); }
@@ -283,7 +299,7 @@
 
         @media print {
             body { background: white; }
-            .btn-container, .header-banner { display: none; }
+            .btn-container, .header-banner, .admin-link { display: none; }
             .card { box-shadow: none; border: 1px solid #ddd; page-break-inside: avoid; }
         }
 
@@ -311,7 +327,6 @@
             <div id="message" class="message"></div>
 
             <form id="controlForm">
-                <!-- Información General -->
                 <div class="form-section">
                     <h3>🏛️ Información del Ministerio</h3>
                     <div class="form-row">
@@ -345,7 +360,6 @@
                     </div>
                 </div>
 
-                <!-- Tabla de Actividades -->
                 <div class="form-section">
                     <h3>📊 Registro de Actividades Semanales (Máximo 5 actividades)</h3>
                     <div class="activities-table-container">
@@ -364,7 +378,6 @@
                                 </tr>
                             </thead>
                             <tbody id="tableBody">
-                                <!-- Las 5 filas se generarán con JavaScript -->
                             </tbody>
                         </table>
                     </div>
@@ -379,8 +392,9 @@
         </div>
     </div>
 
+    <a href="panel_admin.html" class="admin-link">🔐 Admin</a>
+
     <script>
-        // Configuración de la base de datos
         const DB_KEY = 'cristo_es_la_roca_db';
         
         function initDB() {
@@ -389,7 +403,6 @@
             }
         }
 
-        // Generar las 5 filas de la tabla
         function generateTableRows() {
             const tbody = document.getElementById('tableBody');
             tbody.innerHTML = '';
@@ -417,7 +430,6 @@
             }
         }
 
-        // Obtener datos del formulario
         function getFormData() {
             const formData = new FormData(document.getElementById('controlForm'));
             const data = {
@@ -431,7 +443,6 @@
                 actividades: []
             };
 
-            // Recolectar datos de las 5 filas
             for (let i = 1; i <= 5; i++) {
                 const actividad = {
                     fila: i,
@@ -446,7 +457,6 @@
                     observaciones: formData.get(`observaciones_${i}`)
                 };
                 
-                // Solo agregar si tiene al menos la actividad o fecha
                 if (actividad.actividad || actividad.fecha) {
                     data.actividades.push(actividad);
                 }
@@ -455,14 +465,12 @@
             return data;
         }
 
-        // Guardar en base de datos
         function saveToDB(data) {
             const registros = JSON.parse(localStorage.getItem(DB_KEY)) || [];
             registros.unshift(data);
             localStorage.setItem(DB_KEY, JSON.stringify(registros));
         }
 
-        // Mostrar mensaje
         function showMessage(text, type) {
             const msgDiv = document.getElementById('message');
             msgDiv.textContent = text;
@@ -473,7 +481,6 @@
             }, 4000);
         }
 
-        // Limpiar formulario
         function limpiarFormulario() {
             if (confirm('¿Desea limpiar todos los campos? Se perderán los datos no guardados.')) {
                 document.getElementById('controlForm').reset();
@@ -482,7 +489,6 @@
             }
         }
 
-        // Establecer fechas por defecto (semana actual)
         function setDefaultDates() {
             const hoy = new Date();
             const diaSemana = hoy.getDay();
@@ -494,7 +500,6 @@
             document.getElementById('fechaHasta').valueAsDate = finSemana;
         }
 
-        // Manejar envío del formulario
         document.getElementById('controlForm').addEventListener('submit', function(e) {
             e.preventDefault();
             
@@ -516,7 +521,6 @@
                 saveToDB(data);
                 showMessage('✅ ¡Control semanal guardado exitosamente! Dios bendiga su ministerio.', 'success');
                 
-                // Opcional: limpiar formulario después de guardar
                 setTimeout(() => {
                     document.getElementById('controlForm').reset();
                     generateTableRows();
@@ -528,7 +532,6 @@
             }, 600);
         });
 
-        // Inicializar
         initDB();
         generateTableRows();
         setDefaultDates();
