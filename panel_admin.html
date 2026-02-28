@@ -1141,18 +1141,20 @@
             showLoading(true);
             
             try {
-                const response = await fetch(API_URL);
-                const data = await response.json();
+                const response = await fetch(API_URL, {
+                    method: 'GET',
+                    mode: 'no-cors',
+                    cache: 'no-cache'
+                });
                 
-                if (Array.isArray(data)) {
-                    datosGlobales = transformarDatosSheets(data);
-                    updateConnectionStatus(true);
-                } else {
-                    throw new Error('Formato incorrecto');
-                }
+                // En modo no-cors no podemos leer la respuesta directamente
+                // Usamos datos locales como respaldo
+                const localData = JSON.parse(localStorage.getItem('cristo_es_la_roca_offline')) || [];
+                datosGlobales = localData;
+                updateConnectionStatus(false);
+                
             } catch (error) {
                 console.error('Error:', error);
-                // Fallback a localStorage
                 const localData = JSON.parse(localStorage.getItem('cristo_es_la_roca_offline')) || [];
                 datosGlobales = localData;
                 updateConnectionStatus(false);
@@ -1160,39 +1162,6 @@
                 showLoading(false);
                 actualizarTodo();
             }
-        }
-
-        function transformarDatosSheets(sheetsData) {
-            const agrupados = {};
-            
-            sheetsData.forEach(row => {
-                const key = `${row.Lider}_${row['Fecha Desde']}_${row['Fecha Hasta']}`;
-                if (!agrupados[key]) {
-                    agrupados[key] = {
-                        id: row.ID || Date.now(),
-                        ministerio: row.Ministerio,
-                        lider: row.Lider,
-                        fechaDesde: row['Fecha Desde'],
-                        fechaHasta: row['Fecha Hasta'],
-                        fechaRegistro: row['Fecha Registro'],
-                        actividades: []
-                    };
-                }
-                
-                agrupados[key].actividades.push({
-                    fecha: row['Fecha Actividad'],
-                    actividad: row.Actividad,
-                    meta: row.Meta,
-                    participantes: parseInt(row.Participantes) || 0,
-                    ausentes: parseInt(row.Ausentes) || 0,
-                    ofrenda: parseFloat(row.Ofrenda) || 0,
-                    cumplida: row['Meta Cumplida'],
-                    resultados: row.Resultados,
-                    observaciones: row.Observaciones
-                });
-            });
-            
-            return Object.values(agrupados);
         }
 
         function updateConnectionStatus(online) {
