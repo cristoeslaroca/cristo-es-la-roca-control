@@ -7,6 +7,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
     <style>
+        /* ... (mantener todos los estilos anteriores) ... */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f7fa; min-height: 100vh; }
         .login-screen {
@@ -557,21 +558,28 @@
         }
 
         function transformarDatos(sheetsData) {
+            console.log('=== TRANSFORMAR DATOS ===');
+            console.log('Datos recibidos:', sheetsData.length, 'filas');
+            
             const agrupados = {};
             
-            sheetsData.forEach(row => {
-                const id = row.ID || row.id || Date.now();
-                const ministerio = row.Ministerio || row.ministerio || '';
-                const lider = row.Lider || row.lider || '';
-                const fechaDesde = row['Fecha Desde'] || row.fechaDesde || '';
-                const fechaHasta = row['Fecha Hasta'] || row.fechaHasta || '';
-                const fechaRegistro = row['Fecha Registro'] || row.fechaRegistro || new Date().toISOString();
+            sheetsData.forEach((row, index) => {
+                if (index === 0) {
+                    console.log('Primera fila (ejemplo):', row);
+                }
+                
+                const id = row[0] || row.ID || row.id || Date.now(); // Columna 0 es ID
+                const ministerio = row[1] || row.Ministerio || row.ministerio || ''; // Columna 1
+                const lider = row[2] || row.Lider || row.lider || ''; // Columna 2
+                const fechaDesde = row[3] || row['Fecha Desde'] || row.fechaDesde || ''; // Columna 3
+                const fechaHasta = row[4] || row['Fecha Hasta'] || row.fechaHasta || ''; // Columna 4
+                const fechaRegistro = row[5] || row['Fecha Registro'] || row.fechaRegistro || new Date().toISOString(); // Columna 5
                 
                 const key = `${lider}_${fechaDesde}`;
                 
                 if (!agrupados[key]) {
                     agrupados[key] = {
-                        id: id.toString(), // Convertir ID a string
+                        id: id.toString(),
                         ministerio: ministerio,
                         lider: lider,
                         fechaDesde: fechaDesde,
@@ -581,23 +589,27 @@
                     };
                 }
                 
-                const actividad = row.Actividad || row.actividad;
-                if (actividad || row['Fecha Actividad']) {
+                const actividad = row[6] || row.Actividad || row.actividad; // Columna 6
+                if (actividad || row[7] || row['Fecha Actividad']) {
                     agrupados[key].actividades.push({
-                        fecha: row['Fecha Actividad'] || row.fechaActividad || '',
+                        fecha: row[7] || row['Fecha Actividad'] || row.fechaActividad || '',
                         actividad: actividad || '',
-                        meta: row.Meta || row.meta || '',
-                        participantes: parseInt(row.Participantes || row.participantes) || 0,
-                        ausentes: parseInt(row.Ausentes || row.ausentes) || 0,
-                        ofrenda: parseFloat(row.Ofrenda || row.ofrenda) || 0,
-                        cumplida: row['Meta Cumplida'] || row.metaCumplida || '',
-                        resultados: row.Resultados || row.resultados || '',
-                        observaciones: row.Observaciones || row.observaciones || ''
+                        meta: row[8] || row.Meta || row.meta || '',
+                        participantes: parseInt(row[9] || row.Participantes || row.participantes) || 0,
+                        ausentes: parseInt(row[10] || row.Ausentes || row.ausentes) || 0,
+                        ofrenda: parseFloat(row[11] || row.Ofrenda || row.ofrenda) || 0,
+                        cumplida: row[12] || row['Meta Cumplida'] || row.metaCumplida || '',
+                        resultados: row[13] || row.Resultados || row.resultados || '',
+                        observaciones: row[14] || row.Observaciones || row.observaciones || ''
                     });
                 }
             });
             
-            return Object.values(agrupados);
+            const resultado = Object.values(agrupados);
+            console.log('Datos transformados:', resultado.length, 'registros');
+            console.log('Primer registro:', resultado[0]);
+            
+            return resultado;
         }
 
         function updateConnectionStatus(status) {
@@ -620,19 +632,33 @@
         }
 
         // ============================================================
-        // FUNCIONES DE ELIMINACIÓN - CORREGIDAS
+        // FUNCIONES DE ELIMINACIÓN - ULTRA DEPURADAS
         // ============================================================
 
         // Mostrar modal para eliminar un registro
         function mostrarEliminar(id) {
-            idAEliminar = id.toString(); // Asegurar que sea string
+            console.log('=== MOSTRAR ELIMINAR ===');
+            console.log('ID recibido:', id);
+            console.log('Tipo de ID:', typeof id);
+            
+            idAEliminar = id.toString();
+            console.log('ID a eliminar (string):', idAEliminar);
+            
             const reg = datosGlobales.find(r => r.id === idAEliminar);
+            console.log('Registro encontrado:', reg);
+            
             document.getElementById('confirmMessage').innerHTML = 
                 `¿Está seguro de eliminar el registro de <strong>${reg ? reg.lider : 'este líder'}</strong>?<br><small>Esta acción no se puede deshacer.</small>`;
             
             // Configurar el botón de confirmación
             const btnConfirmar = document.getElementById('confirmBtn');
+            
+            // Eliminar cualquier onclick anterior
+            btnConfirmar.onclick = null;
+            
+            // Asignar nuevo onclick
             btnConfirmar.onclick = function() {
+                console.log('Botón Sí, Eliminar clickeado');
                 confirmarEliminar();
             };
             
@@ -647,49 +673,60 @@
 
         // Confirmar eliminación de un registro
         async function confirmarEliminar() {
+            console.log('=== CONFIRMAR ELIMINAR ===');
+            console.log('idAEliminar:', idAEliminar);
+            
             if (!idAEliminar) {
-                console.error('No hay ID para eliminar');
+                console.error('ERROR: No hay ID para eliminar');
+                alert('Error: No se pudo identificar el registro a eliminar');
                 return;
             }
             
-            console.log('Eliminando ID:', idAEliminar);
             cerrarConfirmModal();
             showLoading(true);
             
             try {
+                console.log('Llamando a eliminarRegistroJSONP con ID:', idAEliminar);
                 const resultado = await eliminarRegistroJSONP(idAEliminar);
-                console.log('Resultado:', resultado);
+                console.log('Resultado de eliminación:', resultado);
                 
                 if (resultado.success) {
                     showAlert('✅ Registro eliminado correctamente', 'success');
-                    // Esperar un momento antes de recargar para que Sheets actualice
+                    // Esperar 2 segundos antes de recargar para que Sheets actualice
                     setTimeout(async () => {
                         await cargarDatos();
-                    }, 1000);
+                    }, 2000);
                 } else {
                     showAlert('❌ Error al eliminar: ' + (resultado.error || 'Error desconocido'), 'error');
                 }
             } catch (error) {
-                console.error('Error en confirmarEliminar:', error);
-                showAlert('❌ Error de conexión al eliminar', 'error');
+                console.error('ERROR en confirmarEliminar:', error);
+                showAlert('❌ Error de conexión al eliminar: ' + error.message, 'error');
             } finally {
                 showLoading(false);
             }
         }
 
-        // Eliminar registro vía JSONP - CORREGIDO
+        // Eliminar registro vía JSONP - VERSIÓN ULTRA DEPURADA
         function eliminarRegistroJSONP(id) {
+            console.log('=== ELIMINAR REGISTRO JSONP ===');
+            console.log('ID recibido:', id);
+            
             return new Promise((resolve) => {
                 const callbackName = 'deleteCallback_' + Date.now();
+                console.log('Callback name:', callbackName);
+                
                 const script = document.createElement('script');
                 
-                // Asegurar que el ID sea string y codificarlo
-                const idString = id.toString();
-                const url = `${API_URL}?callback=${callbackName}&action=eliminar&id=${encodeURIComponent(idString)}&_=${Date.now()}`;
+                // Asegurar que el ID sea string y codificarlo correctamente
+                const idString = id.toString().trim();
+                const encodedId = encodeURIComponent(idString);
                 
-                console.log('URL de eliminación:', url);
+                const url = `${API_URL}?callback=${callbackName}&action=eliminar&id=${encodedId}&_=${Date.now()}`;
+                console.log('URL completa:', url);
                 
                 const timeout = setTimeout(() => {
+                    console.log('TIMEOUT: La petición tardó demasiado');
                     cleanup();
                     resolve({success: false, error: 'timeout'});
                 }, 15000);
@@ -698,24 +735,31 @@
                     clearTimeout(timeout);
                     if (script.parentNode) script.parentNode.removeChild(script);
                     delete window[callbackName];
+                    console.log('Cleanup ejecutado');
                 }
                 
                 window[callbackName] = function(response) {
                     console.log('Respuesta del servidor:', response);
                     cleanup();
+                    
                     if (response && response.result === 'success') {
                         resolve({success: true, data: response});
                     } else {
-                        resolve({success: false, error: response ? response.message : 'Error desconocido'});
+                        resolve({
+                            success: false, 
+                            error: response ? (response.message || 'Error del servidor') : 'Error desconocido'
+                        });
                     }
                 };
                 
-                script.onerror = () => {
+                script.onerror = (e) => {
+                    console.error('Error de script:', e);
                     cleanup();
                     resolve({success: false, error: 'network'});
                 };
                 
                 script.src = url;
+                console.log('Agregando script al DOM...');
                 document.head.appendChild(script);
             });
         }
@@ -753,7 +797,7 @@
                     localStorage.removeItem('cristo_es_la_roca_offline');
                     setTimeout(async () => {
                         await cargarDatos();
-                    }, 1000);
+                    }, 2000);
                 } else {
                     showAlert('❌ ' + resultado.error, 'error');
                 }
@@ -903,6 +947,9 @@
         }
 
         function actualizarRegistros() {
+            console.log('=== ACTUALIZAR REGISTROS ===');
+            console.log('Total datos:', datosGlobales.length);
+            
             const tbody = document.getElementById('registrosBody');
             
             if (datosGlobales.length === 0) {
@@ -910,11 +957,16 @@
                 return;
             }
 
-            tbody.innerHTML = datosGlobales.map(reg => {
+            tbody.innerHTML = datosGlobales.map((reg, index) => {
                 const totalPart = reg.actividades ? reg.actividades.reduce((s, a) => s + (a.participantes || 0), 0) : 0;
                 const totalOfrenda = reg.actividades ? reg.actividades.reduce((s, a) => s + (a.ofrenda || 0), 0) : 0;
                 const metasCum = reg.actividades ? reg.actividades.filter(a => a.cumplida === 'SI').length : 0;
                 const metasTot = reg.actividades ? reg.actividades.filter(a => a.cumplida).length : 0;
+                
+                // Log para verificar el ID en la primera fila
+                if (index === 0) {
+                    console.log('Primer registro - ID:', reg.id, 'Tipo:', typeof reg.id, 'Líder:', reg.lider);
+                }
                 
                 return `
                     <tr>
@@ -1150,8 +1202,17 @@
         }
 
         function verDetalle(id) {
+            console.log('=== VER DETALLE ===');
+            console.log('ID recibido:', id);
+            
             const reg = datosGlobales.find(r => r.id === id.toString());
-            if (!reg) return;
+            console.log('Registro encontrado:', reg);
+            
+            if (!reg) {
+                console.error('Registro no encontrado');
+                alert('Error: Registro no encontrado');
+                return;
+            }
 
             const totalOfrenda = reg.actividades ? reg.actividades.reduce((s, a) => s + (a.ofrenda || 0), 0) : 0;
             const totalPart = reg.actividades ? reg.actividades.reduce((s, a) => s + (a.participantes || 0), 0) : 0;
@@ -1518,4 +1579,3 @@
     </script>
 </body>
 </html>
-
