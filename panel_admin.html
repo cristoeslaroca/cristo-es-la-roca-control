@@ -645,80 +645,90 @@ function mostrarEliminar(id) {
     console.log('Tipo de ID:', typeof id);
     
     // LIMPIAR EL ID - quitar espacios y convertir a string
-    idAEliminar = id.toString().trim();
-    console.log('ID a eliminar (limpio):', idAEliminar);
-    console.log('Longitud del ID:', idAEliminar.length);
+    const idLimpio = id.toString().trim();
+    idAEliminar = idLimpio; // Guardar en variable global también
     
-    const reg = datosGlobales.find(r => r.id === idAEliminar);
+    console.log('ID a eliminar (limpio):', idLimpio);
+    console.log('Longitud del ID:', idLimpio.length);
+    
+    const reg = datosGlobales.find(r => r.id === idLimpio);
     console.log('Registro encontrado:', reg);
     
     if (!reg) {
-        console.error('No se encontró el registro con ID:', idAEliminar);
+        console.error('No se encontró el registro con ID:', idLimpio);
         console.log('IDs disponibles:', datosGlobales.map(r => r.id));
         alert('Error: No se encontró el registro');
         return;
     }
     
     document.getElementById('confirmMessage').innerHTML = 
-        `¿Está seguro de eliminar el registro de <strong>${reg.lider}</strong>?<br><small>ID: ${idAEliminar}<br>Esta acción no se puede deshacer.</small>`;
+        `¿Está seguro de eliminar el registro de <strong>${reg.lider}</strong>?<br><small>ID: ${idLimpio}<br>Esta acción no se puede deshacer.</small>`;
     
     // Configurar el botón de confirmación
     const btnConfirmar = document.getElementById('confirmBtn');
     
-    // Eliminar cualquier onclick anterior
-    btnConfirmar.onclick = null;
+    // ELIMINAR cualquier event listener anterior clonando el botón
+    const nuevoBtn = btnConfirmar.cloneNode(true);
+    btnConfirmar.parentNode.replaceChild(nuevoBtn, btnConfirmar);
     
-    // Asignar nuevo onclick
-    btnConfirmar.onclick = function() {
-        console.log('Botón Sí, Eliminar clickeado');
-        confirmarEliminar();
+    // Asignar nuevo onclick con el ID capturado en closure
+    nuevoBtn.onclick = function() {
+        console.log('Botón Sí, Eliminar clickeado, ID:', idLimpio);
+        confirmarEliminar(idLimpio); // Pasar ID como parámetro
     };
     
     document.getElementById('confirmModal').style.display = 'flex';
 }
 
-        // Cerrar modal de confirmación
-        function cerrarConfirmModal() {
-            document.getElementById('confirmModal').style.display = 'none';
-            idAEliminar = null;
-        }
+        // Cerrar modal de confirmación - NO limpiar idAEliminar aquí
+function cerrarConfirmModal() {
+    document.getElementById('confirmModal').style.display = 'none';
+    // NO poner idAEliminar = null aquí - se limpia después de la eliminación
+}
 
-        // Confirmar eliminación de un registro
-        async function confirmarEliminar() {
-            console.log('=== CONFIRMAR ELIMINAR ===');
-            console.log('idAEliminar:', idAEliminar);
-            
-            if (!idAEliminar) {
-                console.error('ERROR: No hay ID para eliminar');
-                alert('Error: No se pudo identificar el registro a eliminar');
-                return;
-            }
-            
-            cerrarConfirmModal();
-            showLoading(true);
-            
-            try {
-                console.log('Llamando a eliminarRegistroJSONP con ID:', idAEliminar);
-                const resultado = await eliminarRegistroJSONP(idAEliminar);
-                console.log('Resultado de eliminación:', resultado);
-                
-                if (resultado.success) {
-                    showAlert('✅ Registro eliminado correctamente', 'success');
-                    // Esperar 2 segundos antes de recargar para que Sheets actualice
-                    setTimeout(async () => {
-                        await cargarDatos();
-                    }, 2000);
-                } else {
-                    showAlert('❌ Error al eliminar: ' + (resultado.error || 'Error desconocido'), 'error');
-                }
-            } catch (error) {
-                console.error('ERROR en confirmarEliminar:', error);
-                showAlert('❌ Error de conexión al eliminar: ' + error.message, 'error');
-            } finally {
-                showLoading(false);
-            }
+        // Confirmar eliminación de un registro - RECIBE ID COMO PARÁMETRO
+async function confirmarEliminar(idParametro) {
+    console.log('=== CONFIRMAR ELIMINAR ===');
+    console.log('ID recibido como parámetro:', idParametro);
+    console.log('idAEliminar global:', idAEliminar);
+    
+    // Usar el ID del parámetro, no el global
+    const idAEliminarLocal = idParametro || idAEliminar;
+    
+    if (!idAEliminarLocal) {
+        console.error('ERROR: No hay ID para eliminar');
+        alert('Error: No se pudo identificar el registro a eliminar');
+        return;
+    }
+    
+    console.log('ID final a eliminar:', idAEliminarLocal);
+    
+    // Cerrar modal DESPUÉS de capturar el ID
+    cerrarConfirmModal();
+    showLoading(true);
+    
+    try {
+        console.log('Llamando a eliminarRegistroJSONP con ID:', idAEliminarLocal);
+        const resultado = await eliminarRegistroJSONP(idAEliminarLocal);
+        console.log('Resultado de eliminación:', resultado);
+        
+        if (resultado.success) {
+            showAlert('✅ Registro eliminado correctamente', 'success');
+            // Esperar 2 segundos antes de recargar para que Sheets actualice
+            setTimeout(async () => {
+                await cargarDatos();
+            }, 2000);
+        } else {
+            showAlert('❌ Error al eliminar: ' + (resultado.error || 'Error desconocido'), 'error');
         }
-
+    } catch (error) {
+        console.error('ERROR en confirmarEliminar:', error);
+        showAlert('❌ Error de conexión al eliminar: ' + error.message, 'error');
+    } finally {
+        showLoading(false);
+        idAEliminar = null; // Limpiar variable global al final
+    }
+}
         // Eliminar registro vía JSONP - VERSIÓN CORREGIDA
 function eliminarRegistroJSONP(id) {
     console.log('=== ELIMINAR REGISTRO JSONP ===');
