@@ -558,59 +558,62 @@
         }
 
         function transformarDatos(sheetsData) {
-            console.log('=== TRANSFORMAR DATOS ===');
-            console.log('Datos recibidos:', sheetsData.length, 'filas');
-            
-            const agrupados = {};
-            
-            sheetsData.forEach((row, index) => {
-                if (index === 0) {
-                    console.log('Primera fila (ejemplo):', row);
-                }
-                
-                const id = row[0] || row.ID || row.id || Date.now(); // Columna 0 es ID
-                const ministerio = row[1] || row.Ministerio || row.ministerio || ''; // Columna 1
-                const lider = row[2] || row.Lider || row.lider || ''; // Columna 2
-                const fechaDesde = row[3] || row['Fecha Desde'] || row.fechaDesde || ''; // Columna 3
-                const fechaHasta = row[4] || row['Fecha Hasta'] || row.fechaHasta || ''; // Columna 4
-                const fechaRegistro = row[5] || row['Fecha Registro'] || row.fechaRegistro || new Date().toISOString(); // Columna 5
-                
-                const key = `${lider}_${fechaDesde}`;
-                
-                if (!agrupados[key]) {
-                    agrupados[key] = {
-                        id: id.toString(),
-                        ministerio: ministerio,
-                        lider: lider,
-                        fechaDesde: fechaDesde,
-                        fechaHasta: fechaHasta,
-                        fechaRegistro: fechaRegistro,
-                        actividades: []
-                    };
-                }
-                
-                const actividad = row[6] || row.Actividad || row.actividad; // Columna 6
-                if (actividad || row[7] || row['Fecha Actividad']) {
-                    agrupados[key].actividades.push({
-                        fecha: row[7] || row['Fecha Actividad'] || row.fechaActividad || '',
-                        actividad: actividad || '',
-                        meta: row[8] || row.Meta || row.meta || '',
-                        participantes: parseInt(row[9] || row.Participantes || row.participantes) || 0,
-                        ausentes: parseInt(row[10] || row.Ausentes || row.ausentes) || 0,
-                        ofrenda: parseFloat(row[11] || row.Ofrenda || row.ofrenda) || 0,
-                        cumplida: row[12] || row['Meta Cumplida'] || row.metaCumplida || '',
-                        resultados: row[13] || row.Resultados || row.resultados || '',
-                        observaciones: row[14] || row.Observaciones || row.observaciones || ''
-                    });
-                }
-            });
-            
-            const resultado = Object.values(agrupados);
-            console.log('Datos transformados:', resultado.length, 'registros');
-            console.log('Primer registro:', resultado[0]);
-            
-            return resultado;
+    console.log('=== TRANSFORMAR DATOS ===');
+    console.log('Datos recibidos:', sheetsData.length, 'filas');
+    
+    const agrupados = {};
+    
+    sheetsData.forEach((row, index) => {
+        if (index === 0) {
+            console.log('Primera fila (ejemplo):', row);
         }
+        
+        // LIMPIAR EL ID - quitar espacios y convertir a string
+        const rawId = row[0] || row.ID || row.id || Date.now();
+        const id = rawId.toString().trim(); // ← IMPORTANTE: .trim() para quitar espacios
+        
+        const ministerio = (row[1] || row.Ministerio || row.ministerio || '').toString().trim();
+        const lider = (row[2] || row.Lider || row.lider || '').toString().trim();
+        const fechaDesde = (row[3] || row['Fecha Desde'] || row.fechaDesde || '').toString().trim();
+        const fechaHasta = (row[4] || row['Fecha Hasta'] || row.fechaHasta || '').toString().trim();
+        const fechaRegistro = (row[5] || row['Fecha Registro'] || row.fechaRegistro || new Date().toISOString()).toString().trim();
+        
+        const key = `${lider}_${fechaDesde}`;
+        
+        if (!agrupados[key]) {
+            agrupados[key] = {
+                id: id, // ID limpio sin espacios
+                ministerio: ministerio,
+                lider: lider,
+                fechaDesde: fechaDesde,
+                fechaHasta: fechaHasta,
+                fechaRegistro: fechaRegistro,
+                actividades: []
+            };
+        }
+        
+        const actividad = row[6] || row.Actividad || row.actividad;
+        if (actividad || row[7] || row['Fecha Actividad']) {
+            agrupados[key].actividades.push({
+                fecha: (row[7] || row['Fecha Actividad'] || row.fechaActividad || '').toString().trim(),
+                actividad: (actividad || '').toString().trim(),
+                meta: (row[8] || row.Meta || row.meta || '').toString().trim(),
+                participantes: parseInt(row[9] || row.Participantes || row.participantes) || 0,
+                ausentes: parseInt(row[10] || row.Ausentes || row.ausentes) || 0,
+                ofrenda: parseFloat(row[11] || row.Ofrenda || row.ofrenda) || 0,
+                cumplida: (row[12] || row['Meta Cumplida'] || row.metaCumplida || '').toString().trim(),
+                resultados: (row[13] || row.Resultados || row.resultados || '').toString().trim(),
+                observaciones: (row[14] || row.Observaciones || row.observaciones || '').toString().trim()
+            });
+        }
+    });
+    
+    const resultado = Object.values(agrupados);
+    console.log('Datos transformados:', resultado.length, 'registros');
+    console.log('Primer registro:', resultado[0]);
+    
+    return resultado;
+}
 
         function updateConnectionStatus(status) {
             const statusEl = document.getElementById('connectionStatus');
@@ -636,34 +639,43 @@
         // ============================================================
 
         // Mostrar modal para eliminar un registro
-        function mostrarEliminar(id) {
-            console.log('=== MOSTRAR ELIMINAR ===');
-            console.log('ID recibido:', id);
-            console.log('Tipo de ID:', typeof id);
-            
-            idAEliminar = id.toString();
-            console.log('ID a eliminar (string):', idAEliminar);
-            
-            const reg = datosGlobales.find(r => r.id === idAEliminar);
-            console.log('Registro encontrado:', reg);
-            
-            document.getElementById('confirmMessage').innerHTML = 
-                `¿Está seguro de eliminar el registro de <strong>${reg ? reg.lider : 'este líder'}</strong>?<br><small>Esta acción no se puede deshacer.</small>`;
-            
-            // Configurar el botón de confirmación
-            const btnConfirmar = document.getElementById('confirmBtn');
-            
-            // Eliminar cualquier onclick anterior
-            btnConfirmar.onclick = null;
-            
-            // Asignar nuevo onclick
-            btnConfirmar.onclick = function() {
-                console.log('Botón Sí, Eliminar clickeado');
-                confirmarEliminar();
-            };
-            
-            document.getElementById('confirmModal').style.display = 'flex';
-        }
+function mostrarEliminar(id) {
+    console.log('=== MOSTRAR ELIMINAR ===');
+    console.log('ID recibido:', id);
+    console.log('Tipo de ID:', typeof id);
+    
+    // LIMPIAR EL ID - quitar espacios y convertir a string
+    idAEliminar = id.toString().trim();
+    console.log('ID a eliminar (limpio):', idAEliminar);
+    console.log('Longitud del ID:', idAEliminar.length);
+    
+    const reg = datosGlobales.find(r => r.id === idAEliminar);
+    console.log('Registro encontrado:', reg);
+    
+    if (!reg) {
+        console.error('No se encontró el registro con ID:', idAEliminar);
+        console.log('IDs disponibles:', datosGlobales.map(r => r.id));
+        alert('Error: No se encontró el registro');
+        return;
+    }
+    
+    document.getElementById('confirmMessage').innerHTML = 
+        `¿Está seguro de eliminar el registro de <strong>${reg.lider}</strong>?<br><small>ID: ${idAEliminar}<br>Esta acción no se puede deshacer.</small>`;
+    
+    // Configurar el botón de confirmación
+    const btnConfirmar = document.getElementById('confirmBtn');
+    
+    // Eliminar cualquier onclick anterior
+    btnConfirmar.onclick = null;
+    
+    // Asignar nuevo onclick
+    btnConfirmar.onclick = function() {
+        console.log('Botón Sí, Eliminar clickeado');
+        confirmarEliminar();
+    };
+    
+    document.getElementById('confirmModal').style.display = 'flex';
+}
 
         // Cerrar modal de confirmación
         function cerrarConfirmModal() {
@@ -707,62 +719,63 @@
             }
         }
 
-        // Eliminar registro vía JSONP - VERSIÓN ULTRA DEPURADA
-        function eliminarRegistroJSONP(id) {
-            console.log('=== ELIMINAR REGISTRO JSONP ===');
-            console.log('ID recibido:', id);
-            
-            return new Promise((resolve) => {
-                const callbackName = 'deleteCallback_' + Date.now();
-                console.log('Callback name:', callbackName);
-                
-                const script = document.createElement('script');
-                
-                // Asegurar que el ID sea string y codificarlo correctamente
-                const idString = id.toString().trim();
-                const encodedId = encodeURIComponent(idString);
-                
-                const url = `${API_URL}?callback=${callbackName}&action=eliminar&id=${encodedId}&_=${Date.now()}`;
-                console.log('URL completa:', url);
-                
-                const timeout = setTimeout(() => {
-                    console.log('TIMEOUT: La petición tardó demasiado');
-                    cleanup();
-                    resolve({success: false, error: 'timeout'});
-                }, 15000);
-                
-                function cleanup() {
-                    clearTimeout(timeout);
-                    if (script.parentNode) script.parentNode.removeChild(script);
-                    delete window[callbackName];
-                    console.log('Cleanup ejecutado');
-                }
-                
-                window[callbackName] = function(response) {
-                    console.log('Respuesta del servidor:', response);
-                    cleanup();
-                    
-                    if (response && response.result === 'success') {
-                        resolve({success: true, data: response});
-                    } else {
-                        resolve({
-                            success: false, 
-                            error: response ? (response.message || 'Error del servidor') : 'Error desconocido'
-                        });
-                    }
-                };
-                
-                script.onerror = (e) => {
-                    console.error('Error de script:', e);
-                    cleanup();
-                    resolve({success: false, error: 'network'});
-                };
-                
-                script.src = url;
-                console.log('Agregando script al DOM...');
-                document.head.appendChild(script);
-            });
+        // Eliminar registro vía JSONP - VERSIÓN CORREGIDA
+function eliminarRegistroJSONP(id) {
+    console.log('=== ELIMINAR REGISTRO JSONP ===');
+    console.log('ID recibido:', id);
+    
+    return new Promise((resolve) => {
+        const callbackName = 'deleteCallback_' + Date.now();
+        console.log('Callback name:', callbackName);
+        
+        const script = document.createElement('script');
+        
+        // LIMPIAR Y CODIFICAR EL ID
+        const idString = id.toString().trim();
+        const encodedId = encodeURIComponent(idString);
+        
+        const url = `${API_URL}?callback=${callbackName}&action=eliminar&id=${encodedId}&_=${Date.now()}`;
+        console.log('URL completa:', url);
+        console.log('ID enviado:', idString);
+        
+        const timeout = setTimeout(() => {
+            console.log('TIMEOUT: La petición tardó demasiado');
+            cleanup();
+            resolve({success: false, error: 'timeout'});
+        }, 15000);
+        
+        function cleanup() {
+            clearTimeout(timeout);
+            if (script.parentNode) script.parentNode.removeChild(script);
+            delete window[callbackName];
+            console.log('Cleanup ejecutado');
         }
+        
+        window[callbackName] = function(response) {
+            console.log('Respuesta del servidor:', response);
+            cleanup();
+            
+            if (response && response.result === 'success') {
+                resolve({success: true, data: response});
+            } else {
+                resolve({
+                    success: false, 
+                    error: response ? (response.message || 'Error del servidor') : 'Error desconocido'
+                });
+            }
+        };
+        
+        script.onerror = (e) => {
+            console.error('Error de script:', e);
+            cleanup();
+            resolve({success: false, error: 'network'});
+        };
+        
+        script.src = url;
+        console.log('Agregando script al DOM...');
+        document.head.appendChild(script);
+    });
+}
 
         // Mostrar modal para eliminar TODOS
         function mostrarEliminarTodos() {
